@@ -4,6 +4,7 @@ import { Text, View, StyleSheet, ViewStyle, TextStyle, TouchableOpacity, Image, 
 import * as SplashScreen from 'expo-splash-screen';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Svg, { Path } from 'react-native-svg';
+import Login from './pages/authentication/login';
 
 interface AppState {
   isLoading: boolean;
@@ -12,14 +13,8 @@ interface AppState {
   showThemeDropdown: boolean;
   showLogin: boolean;
   showDashboard: boolean;
-  email: string;
-  password: string;
-  showErrorModal: boolean;
-  emailError: boolean;
-  passwordError: boolean;
   activeTab: number;
   hasSeenOnboarding: boolean;
-  showPassword: boolean;
   location: string;
 }
 
@@ -48,8 +43,6 @@ interface AppStyles {
 class App extends React.Component<{}, AppState> {
   private readonly styles: AppStyles;
   private readonly themes: any;
-  private emailShakeAnimation: Animated.Value;
-  private passwordShakeAnimation: Animated.Value;
 
   constructor(props: {}) {
     super(props);
@@ -60,19 +53,10 @@ class App extends React.Component<{}, AppState> {
       showThemeDropdown: false,
       showLogin: false,
       showDashboard: false,
-      email: '',
-      password: '',
-      showErrorModal: false,
-      emailError: false,
-      passwordError: false,
       activeTab: 0,
       hasSeenOnboarding: false,
-      showPassword: false,
       location: '',
     };
-
-    this.emailShakeAnimation = new Animated.Value(0);
-    this.passwordShakeAnimation = new Animated.Value(0);
 
     this.themes = {
       1: {
@@ -361,41 +345,8 @@ class App extends React.Component<{}, AppState> {
   };
 
   private handleLogin = (): void => {
-    const { email, password } = this.state;
-    const isEmailFormatValid = this.isValidEmail(email);
-    const isEmailValid = email === 'admin@garlic.com' && isEmailFormatValid;
-    const isPasswordValid = password === 'garlic123';
-    
-    if (isEmailValid && isPasswordValid) {
-      this.setState({ showDashboard: true, emailError: false, passwordError: false });
-      this.requestLocationPermission();
-    } else {
-      this.setState({ 
-        emailError: !isEmailValid, 
-        passwordError: !isPasswordValid 
-      });
-      
-      if (!isEmailValid) {
-        this.shakeInput(this.emailShakeAnimation);
-      }
-      if (!isPasswordValid) {
-        this.shakeInput(this.passwordShakeAnimation);
-      }
-    }
-  };
-
-  private closeErrorModal = (): void => {
-    this.setState({ showErrorModal: false });
-  };
-
-  private shakeInput = (animation: Animated.Value): void => {
-    animation.setValue(0);
-    Animated.sequence([
-      Animated.timing(animation, { toValue: 10, duration: 100, useNativeDriver: true }),
-      Animated.timing(animation, { toValue: -10, duration: 100, useNativeDriver: true }),
-      Animated.timing(animation, { toValue: 10, duration: 100, useNativeDriver: true }),
-      Animated.timing(animation, { toValue: 0, duration: 100, useNativeDriver: true }),
-    ]).start();
+    this.setState({ showDashboard: true });
+    this.requestLocationPermission();
   };
 
   private selectTab = (tabIndex: number): void => {
@@ -406,22 +357,8 @@ class App extends React.Component<{}, AppState> {
     this.setState({ 
       showDashboard: false, 
       showLogin: true, 
-      email: '', 
-      password: '', 
       activeTab: 0 
     });
-  };
-
-  private clearEmail = (): void => {
-    this.setState({ email: '', emailError: false });
-  };
-
-  private togglePasswordVisibility = (): void => {
-    this.setState({ showPassword: !this.state.showPassword });
-  };
-
-  private isValidEmail = (email: string): boolean => {
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   };
 
   private requestLocationPermission = async (): Promise<void> => {
@@ -455,42 +392,6 @@ class App extends React.Component<{}, AppState> {
     } else {
       this.setState({ location: 'Geolocation not supported' });
     }
-  };
-
-  private renderEyeIcon = (visible: boolean): React.ReactElement => {
-    return React.createElement(
-      Svg,
-      { width: 20, height: 20, viewBox: '0 0 24 24', fill: 'none' },
-      visible
-        ? React.createElement(Path, {
-            stroke: '#999',
-            strokeWidth: 1.5,
-            strokeLinecap: 'round',
-            strokeLinejoin: 'round',
-            d: 'M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z M15 12a3 3 0 11-6 0 3 3 0 016 0z'
-          })
-        : React.createElement(Path, {
-            stroke: '#999',
-            strokeWidth: 1.5,
-            strokeLinecap: 'round',
-            strokeLinejoin: 'round',
-            d: 'M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88'
-          })
-    );
-  };
-
-  private renderXIcon = (): React.ReactElement => {
-    return React.createElement(
-      Svg,
-      { width: 20, height: 20, viewBox: '0 0 24 24', fill: 'none' },
-      React.createElement(Path, {
-        d: 'M6 18L18 6M6 6l12 12',
-        stroke: '#999',
-        strokeWidth: 2,
-        strokeLinecap: 'round',
-        strokeLinejoin: 'round'
-      })
-    );
   };
 
   private renderTabContent(): React.ReactElement {
@@ -781,165 +682,10 @@ class App extends React.Component<{}, AppState> {
   }
 
   private renderLogin(): React.ReactElement {
-    const currentTheme = this.getCurrentTheme();
-    
-    return React.createElement(
-      View,
-      { style: { ...this.styles.container, backgroundColor: currentTheme.background } },
-      React.createElement(
-        View,
-        { style: { ...this.styles.content, justifyContent: 'flex-start', paddingTop: 100 } },
-        React.createElement(
-          Text,
-          { style: { ...this.styles.title, color: currentTheme.text, marginBottom: 10 } },
-          '🧄 Welcome Back!'
-        ),
-        React.createElement(
-          Text,
-          { style: { ...this.styles.description, color: currentTheme.text, marginBottom: 40 } },
-          'Please login to continue'
-        ),
-        React.createElement(
-          View,
-          { style: this.styles.inputContainer },
-          React.createElement(
-            Animated.View,
-            { style: { transform: [{ translateX: this.emailShakeAnimation }] } },
-            React.createElement(
-              View,
-              { style: this.styles.inputWrapper },
-              React.createElement(
-                TextInput,
-                {
-                  style: { 
-                    ...this.styles.input, 
-                    borderColor: this.state.emailError ? '#ff4444' : currentTheme.primary,
-                    paddingRight: this.state.email ? 45 : 15
-                  },
-                  placeholder: 'Email',
-                  value: this.state.email,
-                  onChangeText: (email: string) => this.setState({ email, emailError: false }),
-                  keyboardType: 'email-address',
-                  autoCapitalize: 'none'
-                }
-              ),
-              this.state.email ? React.createElement(
-                TouchableOpacity,
-                {
-                  style: this.styles.inputIcon,
-                  onPress: this.clearEmail
-                },
-                this.renderXIcon()
-              ) : null
-            )
-          ),
-          this.state.emailError ? React.createElement(
-            Text,
-            { style: this.styles.errorLabel },
-            !this.isValidEmail(this.state.email) && this.state.email ? 'Invalid email format' : 'Email not found'
-          ) : null
-        ),
-        React.createElement(
-          View,
-          { style: this.styles.inputContainer },
-          React.createElement(
-            Animated.View,
-            { style: { transform: [{ translateX: this.passwordShakeAnimation }] } },
-            React.createElement(
-              View,
-              { style: this.styles.inputWrapper },
-              React.createElement(
-                TextInput,
-                {
-                  style: { 
-                    ...this.styles.input, 
-                    borderColor: this.state.passwordError ? '#ff4444' : currentTheme.primary,
-                    paddingRight: 45
-                  },
-                  placeholder: 'Password',
-                  value: this.state.password,
-                  onChangeText: (password: string) => this.setState({ password, passwordError: false }),
-                  secureTextEntry: !this.state.showPassword
-                }
-              ),
-              React.createElement(
-                TouchableOpacity,
-                {
-                  style: this.styles.inputIcon,
-                  onPress: this.togglePasswordVisibility
-                },
-                React.createElement(
-                  Text,
-                  { style: { fontSize: 18, color: '#999' } },
-                  this.state.showPassword ? '👁' : '👁‍🗨'
-                )
-              )
-            )
-          ),
-          this.state.passwordError ? React.createElement(
-            Text,
-            { style: this.styles.errorLabel },
-            'Password does not match'
-          ) : null
-        ),
-        React.createElement(
-          TouchableOpacity,
-          {
-            style: { ...this.styles.loginButton, backgroundColor: currentTheme.primary },
-            onPress: this.handleLogin
-          },
-          React.createElement(
-            Text,
-            { style: this.styles.buttonText },
-            'Login'
-          )
-        ),
-        React.createElement(
-          Text,
-          { style: { ...this.styles.description, marginTop: 20, fontSize: 12 } },
-          'Demo: admin@garlic.com / garlic123'
-        )
-      ),
-      React.createElement(
-        Modal,
-        {
-          visible: this.state.showErrorModal,
-          transparent: true,
-          animationType: 'fade'
-        },
-        React.createElement(
-          View,
-          { style: this.styles.modalOverlay },
-          React.createElement(
-            View,
-            { style: { ...this.styles.modalContent, backgroundColor: currentTheme.tertiary } },
-            React.createElement(
-              Text,
-              { style: { ...this.styles.modalTitle, color: currentTheme.text } },
-              'Login Failed'
-            ),
-            React.createElement(
-              Text,
-              { style: { ...this.styles.modalText, color: currentTheme.text } },
-              'Invalid email or password. Please try again.'
-            ),
-            React.createElement(
-              TouchableOpacity,
-              {
-                style: { ...this.styles.modalButton, backgroundColor: currentTheme.primary },
-                onPress: this.closeErrorModal
-              },
-              React.createElement(
-                Text,
-                { style: { color: '#fff', fontWeight: 'bold' } },
-                'OK'
-              )
-            )
-          )
-        )
-      ),
-      React.createElement(StatusBar, { style: 'auto' })
-    );
+    return React.createElement(Login, {
+      onLogin: this.handleLogin,
+      selectedTheme: this.state.selectedTheme
+    });
   }
 
   private renderOnboarding(): React.ReactElement {
