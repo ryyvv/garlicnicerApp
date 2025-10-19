@@ -1,10 +1,12 @@
 import * as React from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { Text, View, StyleSheet, ViewStyle, TextStyle, TouchableOpacity, Image, TextInput, Modal, Animated, PermissionsAndroid, Platform } from 'react-native';
-import * as SplashScreen from 'expo-splash-screen';
+import * as ExpoSplashScreen from 'expo-splash-screen';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Svg, { Path } from 'react-native-svg';
 import Login from './pages/authentication/login';
+import SplashScreen from './pages/splash/SplashScreen';
+import NetworkStatus from './components/NetworkStatus';
 
 interface AppState {
   isLoading: boolean;
@@ -142,16 +144,7 @@ class App extends React.Component<{}, AppState> {
       activeDot: {
         backgroundColor: '#007AFF',
       } as ViewStyle,
-      splashContainer: {
-        flex: 1,
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: '#fff',
-      } as ViewStyle,
-      splashIcon: {
-        width: 450,
-        height: 450,
-      },
+
       themeSelector: {
         position: 'absolute',
         top: 50,
@@ -283,7 +276,7 @@ class App extends React.Component<{}, AppState> {
   }
 
   public async componentDidMount(): Promise<void> {
-    await SplashScreen.preventAutoHideAsync();
+    await ExpoSplashScreen.preventAutoHideAsync();
     const hasSeenOnboarding = await AsyncStorage.getItem('hasSeenOnboarding');
     setTimeout(() => {
       this.setState({ 
@@ -291,7 +284,7 @@ class App extends React.Component<{}, AppState> {
         hasSeenOnboarding: hasSeenOnboarding === 'true',
         showLogin: hasSeenOnboarding === 'true'
       });
-      SplashScreen.hideAsync();
+      ExpoSplashScreen.hideAsync();
     }, 2000);
   }
 
@@ -662,23 +655,7 @@ class App extends React.Component<{}, AppState> {
   };
 
   private renderSplash(): React.ReactElement {
-    return React.createElement(
-      View,
-      { style: this.styles.splashContainer },
-      React.createElement(
-        View,
-        { style: this.styles.content },
-        React.createElement(
-          Image,
-          { 
-            source: require('./assets/res/drawable-xhdpi/splashscreen_image.png'),
-            style: this.styles.splashIcon,
-            resizeMode: 'contain'
-          }
-        ),
-        React.createElement(StatusBar, { style: 'dark' })
-      )
-    );
+    return React.createElement(SplashScreen);
   }
 
   private renderLogin(): React.ReactElement {
@@ -760,19 +737,24 @@ class App extends React.Component<{}, AppState> {
   }
 
   public render(): React.ReactElement {
+    let mainContent;
+    
     if (this.state.isLoading) {
-      return this.renderSplash();
+      mainContent = this.renderSplash();
+    } else if (this.state.showDashboard) {
+      mainContent = this.renderDashboard();
+    } else if (this.state.showLogin || this.state.hasSeenOnboarding) {
+      mainContent = this.renderLogin();
+    } else {
+      mainContent = this.renderOnboarding();
     }
 
-    if (this.state.showDashboard) {
-      return this.renderDashboard();
-    }
-
-    if (this.state.showLogin || this.state.hasSeenOnboarding) {
-      return this.renderLogin();
-    }
-
-    return this.renderOnboarding();
+    return React.createElement(
+      View,
+      { style: { flex: 1 } },
+      mainContent,
+      React.createElement(NetworkStatus)
+    );
   }
 }
 

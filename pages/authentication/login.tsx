@@ -2,6 +2,11 @@ import * as React from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { Text, View, StyleSheet, ViewStyle, TextStyle, TouchableOpacity, TextInput, Modal, Animated } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
+import { auth } from '../../firebase.config';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import NetInfo from '@react-native-community/netinfo';
+import GoogleSignIn from '../../components/GoogleSignIn';
 
 interface LoginState {
   email: string;
@@ -10,6 +15,10 @@ interface LoginState {
   emailError: boolean;
   passwordError: boolean;
   showPassword: boolean;
+  isSignUp: boolean;
+  loading: boolean;
+  isOffline: boolean;
+  rememberMe: boolean;
 }
 
 interface LoginProps {
@@ -51,6 +60,10 @@ class Login extends React.Component<LoginProps, LoginState> {
       emailError: false,
       passwordError: false,
       showPassword: false,
+      isSignUp: false,
+      loading: false,
+      isOffline: false,
+      rememberMe: false,
     };
 
     this.emailShakeAnimation = new Animated.Value(0);
@@ -177,32 +190,95 @@ class Login extends React.Component<LoginProps, LoginState> {
     return this.themes[this.props.selectedTheme];
   };
 
-  private handleLogin = (): void => {
-    const { email, password } = this.state;
-    const isEmailFormatValid = this.isValidEmail(email);
-    const isEmailValid = email === 'admin@garlic.com' && isEmailFormatValid;
-    const isPasswordValid = password === 'garlic123';
+  public async componentDidMount(): Promise<void> {
+    const netInfo = await NetInfo.fetch();
+    this.setState({ isOffline: !netInfo.isConnected });
     
-    if (isEmailValid && isPasswordValid) {
-      this.setState({ emailError: false, passwordError: false });
-      this.props.onLogin();
-    } else {
-      this.setState({ 
-        emailError: !isEmailValid, 
-        passwordError: !isPasswordValid 
-      });
+    const unsubscribe = NetInfo.addEventListener(state => {
+      this.setState({ isOffline: !state.isConnected });
+    });
+
+    const savedCredentials = await AsyncStorage.getItem('savedCredentials');
+    if (savedCredentials) {
+      const { email } = JSON.parse(savedCredentials);
+      this.setState({ email, rememberMe: true });
+    }
+
+    return () => unsubscribe();
+  }
+
+  private handleLogin = async (): Promise<void> => {
+    const { email, password, isSignUp, isOffline, rememberMe } = this.state;
+    
+    if (!this.isValidEmail(email) || !password) {
+      const emailError = !this.isValidEmail(email);
+      const passwordError = !password;
+      this.setState({ emailError, passwordError });
       
-      if (!isEmailValid) {
+      if (emailError) {
         this.shakeInput(this.emailShakeAnimation);
       }
-      if (!isPasswordValid) {
+      if (passwordError) {
         this.shakeInput(this.passwordShakeAnimation);
       }
+      return;
+    }
+
+    if (isOffline && !isSignUp) {
+      const savedCredentials = await AsyncStorage.getItem('savedCredentials');
+      if (savedCredentials) {
+        const { email: savedEmail, password: savedPassword } = JSON.parse(savedCredentials);
+        if (email === savedEmail && password === savedPassword) {
+          this.props.onLogin();
+          return;
+        }
+      }
+      this.setState({ emailError: true, passwordError: true, showErrorModal: true });
+      this.shakeInput(this.emailShakeAnimation);
+      this.shakeInput(this.passwordShakeAnimation);
+      return;
+    }
+
+    if (isOffline && isSignUp) {
+      this.setState({ emailError: true, passwordError: true, showErrorModal: true });
+      this.shakeInput(this.emailShakeAnimation);
+      this.shakeInput(this.passwordShakeAnimation);
+      return;
+    }
+
+    this.setState({ loading: true, emailError: false, passwordError: false });
+
+    try {
+      if (isSignUp) {
+        await createUserWithEmailAndPassword(auth, email, password);
+      } else {
+        await signInWithEmailAndPassword(auth, email, password);
+      }
+      
+      if (rememberMe) {
+        await AsyncStorage.setItem('savedCredentials', JSON.stringify({ email, password }));
+      }
+      
+      this.props.onLogin();
+    } catch (error: any) {
+      this.setState({ emailError: true, passwordError: true, showErrorModal: true });
+      this.shakeInput(this.emailShakeAnimation);
+      this.shakeInput(this.passwordShakeAnimation);
+    } finally {
+      this.setState({ loading: false });
     }
   };
 
   private closeErrorModal = (): void => {
     this.setState({ showErrorModal: false });
+  };
+
+  private handleGoogleSuccess = (): void => {
+    this.props.onLogin();
+  };
+
+  private handleGoogleError = (error: string): void => {
+    this.setState({ showErrorModal: true });
   };
 
   private shakeInput = (animation: Animated.Value): void => {
@@ -217,6 +293,11 @@ class Login extends React.Component<LoginProps, LoginState> {
 
   private clearEmail = (): void => {
     this.setState({ email: '', emailError: false });
+  };
+
+  private clearSavedCredentials = async (): Promise<void> => {
+    await AsyncStorage.removeItem('savedCredentials');
+    this.setState({ rememberMe: false, email: '', password: '' });
   };
 
   private togglePasswordVisibility = (): void => {
@@ -253,13 +334,41 @@ class Login extends React.Component<LoginProps, LoginState> {
         React.createElement(
           Text,
           { style: { ...this.styles.title, color: currentTheme.text, marginBottom: 10 } },
-          '🧄 Welcome Back!'
+          this.state.isSignUp ? '🧄 Create Account!' : '🧄 Welcome Back!'
         ),
         React.createElement(
           Text,
           { style: { ...this.styles.description, color: currentTheme.text, marginBottom: 40 } },
-          'Please login to continue'
+          this.state.isSignUp ? 'Create your account to continue' : 'Please login to continue'
         ),
+        this.state.isOffline ? React.createElement(
+          View,
+          {
+            style: {
+              backgroundColor: '#FFF3CD',
+              borderColor: '#FFEAA7',
+              borderWidth: 1,
+              borderRadius: 8,
+              padding: 12,
+              marginBottom: 20,
+              width: '100%'
+            }
+          },
+          React.createElement(
+            Text,
+            {
+              style: {
+                color: '#856404',
+                fontSize: 14,
+                textAlign: 'center',
+                fontWeight: 'bold'
+              }
+            },
+            this.state.isSignUp 
+              ? '⚠️ Offline Mode: Cannot create new accounts'
+              : '⚠️ Offline Mode: Using saved credentials only'
+          )
+        ) : null,
         React.createElement(
           View,
           { style: this.styles.inputContainer },
@@ -346,20 +455,77 @@ class Login extends React.Component<LoginProps, LoginState> {
         React.createElement(
           TouchableOpacity,
           {
-            style: { ...this.styles.loginButton, backgroundColor: currentTheme.primary },
-            onPress: this.handleLogin
+            style: { ...this.styles.loginButton, backgroundColor: currentTheme.primary, opacity: this.state.loading ? 0.7 : 1 },
+            onPress: this.handleLogin,
+            disabled: this.state.loading
           },
           React.createElement(
             Text,
             { style: this.styles.buttonText },
-            'Login'
+            this.state.loading ? 'Loading...' : (this.state.isSignUp ? 'Sign Up' : 'Login')
           )
         ),
+        !this.state.isSignUp ? React.createElement(
+          TouchableOpacity,
+          {
+            style: { flexDirection: 'row', alignItems: 'center', marginTop: 15 },
+            onPress: () => this.setState({ rememberMe: !this.state.rememberMe })
+          },
+          React.createElement(
+            View,
+            {
+              style: {
+                width: 20,
+                height: 20,
+                borderWidth: 2,
+                borderColor: currentTheme.primary,
+                marginRight: 8,
+                backgroundColor: this.state.rememberMe ? currentTheme.primary : 'transparent'
+              }
+            },
+            this.state.rememberMe ? React.createElement(
+              Text,
+              { style: { color: '#fff', fontSize: 12, textAlign: 'center' } },
+              '✓'
+            ) : null
+          ),
+          React.createElement(
+            Text,
+            { style: { ...this.styles.description, fontSize: 14, color: currentTheme.text, marginBottom: 0 } },
+            'Remember me for offline login'
+          )
+        ) : null,
+        !this.state.isSignUp && this.state.rememberMe ? React.createElement(
+          TouchableOpacity,
+          {
+            style: { marginTop: 10 },
+            onPress: this.clearSavedCredentials
+          },
+          React.createElement(
+            Text,
+            { style: { ...this.styles.description, fontSize: 12, color: '#ff4444', marginBottom: 0 } },
+            'Clear saved credentials'
+          )
+        ) : null,
+        React.createElement(GoogleSignIn, {
+          onSuccess: this.handleGoogleSuccess,
+          onError: this.handleGoogleError,
+          theme: currentTheme,
+          disabled: this.state.loading || this.state.isOffline
+        }),
         React.createElement(
-          Text,
-          { style: { ...this.styles.description, marginTop: 20, fontSize: 12 } },
-          'Demo: admin@garlic.com / garlic123'
-        )
+          TouchableOpacity,
+          {
+            style: { marginTop: 15 },
+            onPress: () => this.setState({ isSignUp: !this.state.isSignUp })
+          },
+          React.createElement(
+            Text,
+            { style: { ...this.styles.description, fontSize: 14, color: currentTheme.primary } },
+            this.state.isSignUp ? 'Already have an account? Login' : 'Don\'t have an account? Sign Up'
+          )
+        ),
+
       ),
       React.createElement(
         Modal,
@@ -382,7 +548,11 @@ class Login extends React.Component<LoginProps, LoginState> {
             React.createElement(
               Text,
               { style: { ...this.styles.modalText, color: currentTheme.text } },
-              'Invalid email or password. Please try again.'
+              this.state.isOffline 
+                ? (this.state.isSignUp 
+                  ? 'Cannot create account while offline. Please check your internet connection.' 
+                  : 'Invalid offline credentials or no saved credentials found.')
+                : 'Invalid email or password. Please try again.'
             ),
             React.createElement(
               TouchableOpacity,
