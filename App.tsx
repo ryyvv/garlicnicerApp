@@ -7,6 +7,7 @@ import Svg, { Path } from 'react-native-svg';
 import Login from './pages/authentication/login';
 import SplashScreen from './pages/splash/SplashScreen';
 import NetworkStatus from './components/NetworkStatus';
+import LocationPicker from './components/LocationPicker';
 
 interface AppState {
   isLoading: boolean;
@@ -508,36 +509,12 @@ class App extends React.Component<{}, AppState> {
           React.createElement(
             View,
             { style: { marginTop: 20, width: '80%' } },
-            React.createElement(
-              Text,
-              { style: { ...this.styles.description, color: currentTheme.text, marginBottom: 10 } },
-              'Current Location'
-            ),
-            React.createElement(
-              View,
-              { style: { flexDirection: 'row', alignItems: 'center' } },
-              React.createElement(
-                TextInput,
-                {
-                  style: { ...this.styles.input, flex: 1, marginRight: 10, marginBottom: 0 },
-                  placeholder: 'Latitude, Longitude',
-                  value: this.state.location,
-                  editable: false
-                }
-              ),
-              React.createElement(
-                TouchableOpacity,
-                {
-                  style: { ...this.styles.button, backgroundColor: currentTheme.primary, paddingHorizontal: 15, paddingVertical: 12 },
-                  onPress: this.getCurrentLocation
-                },
-                React.createElement(
-                  Text,
-                  { style: { ...this.styles.buttonText, fontSize: 12 } },
-                  'Get Location'
-                )
-              )
-            )
+            React.createElement(LocationPicker, {
+              theme: currentTheme,
+              onLocationChange: (locationData) => {
+                this.setState({ location: locationData.coordinates });
+              }
+            })
           ),
           React.createElement(
             TouchableOpacity,

@@ -7,6 +7,8 @@ import { auth } from '../../firebase.config';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
 import GoogleSignIn from '../../components/GoogleSignIn';
+import { ForgotPasswordPage } from './forgotpassword';
+import { RegisterPage } from './register';
 
 interface LoginState {
   email: string;
@@ -19,6 +21,7 @@ interface LoginState {
   loading: boolean;
   isOffline: boolean;
   rememberMe: boolean;
+  currentView: 'login' | 'register' | 'forgotPassword';
 }
 
 interface LoginProps {
@@ -64,6 +67,7 @@ class Login extends React.Component<LoginProps, LoginState> {
       loading: false,
       isOffline: false,
       rememberMe: false,
+      currentView: 'login',
     };
 
     this.emailShakeAnimation = new Animated.Value(0);
@@ -325,6 +329,22 @@ class Login extends React.Component<LoginProps, LoginState> {
   public render(): React.ReactElement {
     const currentTheme = this.getCurrentTheme();
     
+    if (this.state.currentView === 'forgotPassword') {
+      return React.createElement(ForgotPasswordPage, {
+        theme: currentTheme,
+        styles: this.styles,
+        onBackToLogin: () => this.setState({ currentView: 'login' })
+      });
+    }
+    
+    if (this.state.currentView === 'register') {
+      return React.createElement(RegisterPage, {
+        theme: currentTheme,
+        styles: this.styles,
+        onBackToLogin: () => this.setState({ currentView: 'login' })
+      });
+    }
+    
     return React.createElement(
       View,
       { style: { ...this.styles.container, backgroundColor: currentTheme.background } },
@@ -452,6 +472,53 @@ class Login extends React.Component<LoginProps, LoginState> {
             'Password does not match'
           ) : null
         ),
+        !this.state.isSignUp ? React.createElement(
+          View,
+          {
+            style: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 5, width: '100%' }
+          },
+          React.createElement(
+            TouchableOpacity,
+            {
+              style: { flexDirection: 'row', alignItems: 'center' },
+              onPress: () => this.setState({ rememberMe: !this.state.rememberMe })
+            },
+            React.createElement(
+              View,
+              {
+                style: {
+                  width: 20,
+                  height: 20,
+                  borderWidth: 2,
+                  borderColor: currentTheme.primary,
+                  marginRight: 8,
+                  backgroundColor: this.state.rememberMe ? currentTheme.primary : 'transparent'
+                }
+              },
+              this.state.rememberMe ? React.createElement(
+                Text,
+                { style: { color: '#fff', fontSize: 12, textAlign: 'center' } },
+                '✓'
+              ) : null
+            ),
+            React.createElement(
+              Text,
+              { style: { fontSize: 14, color: currentTheme.text } },
+              'Remember me'
+            )
+          ),
+          React.createElement(
+            TouchableOpacity,
+            {
+              onPress: () => this.setState({ currentView: 'forgotPassword' })
+            },
+            React.createElement(
+              Text,
+              { style: { fontSize: 14, color: currentTheme.primary } },
+              'Forgot password?'
+            )
+          )
+        ) : null,
         React.createElement(
           TouchableOpacity,
           {
@@ -465,48 +532,6 @@ class Login extends React.Component<LoginProps, LoginState> {
             this.state.loading ? 'Loading...' : (this.state.isSignUp ? 'Sign Up' : 'Login')
           )
         ),
-        !this.state.isSignUp ? React.createElement(
-          TouchableOpacity,
-          {
-            style: { flexDirection: 'row', alignItems: 'center', marginTop: 15 },
-            onPress: () => this.setState({ rememberMe: !this.state.rememberMe })
-          },
-          React.createElement(
-            View,
-            {
-              style: {
-                width: 20,
-                height: 20,
-                borderWidth: 2,
-                borderColor: currentTheme.primary,
-                marginRight: 8,
-                backgroundColor: this.state.rememberMe ? currentTheme.primary : 'transparent'
-              }
-            },
-            this.state.rememberMe ? React.createElement(
-              Text,
-              { style: { color: '#fff', fontSize: 12, textAlign: 'center' } },
-              '✓'
-            ) : null
-          ),
-          React.createElement(
-            Text,
-            { style: { ...this.styles.description, fontSize: 14, color: currentTheme.text, marginBottom: 0 } },
-            'Remember me for offline login'
-          )
-        ) : null,
-        !this.state.isSignUp && this.state.rememberMe ? React.createElement(
-          TouchableOpacity,
-          {
-            style: { marginTop: 10 },
-            onPress: this.clearSavedCredentials
-          },
-          React.createElement(
-            Text,
-            { style: { ...this.styles.description, fontSize: 12, color: '#ff4444', marginBottom: 0 } },
-            'Clear saved credentials'
-          )
-        ) : null,
         React.createElement(GoogleSignIn, {
           onSuccess: this.handleGoogleSuccess,
           onError: this.handleGoogleError,
@@ -517,7 +542,7 @@ class Login extends React.Component<LoginProps, LoginState> {
           TouchableOpacity,
           {
             style: { marginTop: 15 },
-            onPress: () => this.setState({ isSignUp: !this.state.isSignUp })
+            onPress: () => this.setState({ currentView: this.state.isSignUp ? 'login' : 'register' })
           },
           React.createElement(
             Text,
