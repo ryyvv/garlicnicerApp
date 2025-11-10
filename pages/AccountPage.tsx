@@ -1,6 +1,7 @@
-import * as React from 'react';
+import React, { Component } from 'react';
 import { SafeAreaView, ScrollView, View, Text, TextInput, TouchableOpacity } from 'react-native';
 import * as Location from 'expo-location';
+import { ThemeManager, themes, getTheme } from '../components/ThemeManager';
 
 interface AccountPageProps {
   theme: any;
@@ -11,30 +12,28 @@ interface AccountPageProps {
 }
 
 interface AccountPageState {
-  showThemeDropdown: boolean;
   location: string;
   barangay: string;
   municipality: string;
   province: string;
   region: string;
+  currentTheme: any;
 }
 
-export class AccountPage extends React.Component<AccountPageProps, AccountPageState> {
+
+
+export class AccountPage extends Component<AccountPageProps, AccountPageState> {
   constructor(props: AccountPageProps) {
     super(props);
     this.state = {
-      showThemeDropdown: false,
       location: '',
       barangay: '',
       municipality: '',
       province: '',
-      region: ''
+      region: '',
+      currentTheme: getTheme(props.selectedTheme)
     };
   }
-
-  private toggleThemeDropdown = (): void => {
-    this.setState({ showThemeDropdown: !this.state.showThemeDropdown });
-  };
 
   private getCurrentLocation = async (): Promise<void> => {
     try {
@@ -66,163 +65,89 @@ export class AccountPage extends React.Component<AccountPageProps, AccountPageSt
     }
   };
 
-  render(): React.ReactElement {
+  render() {
     const { theme, styles, selectedTheme, onSelectTheme, onLogout } = this.props;
-    const { showThemeDropdown, location, barangay, municipality, province, region } = this.state;
+    const { location, barangay, municipality, province, region } = this.state;
 
-    return React.createElement(
-      SafeAreaView,
-      { style: { flex: 1, backgroundColor: theme.background } },
-      React.createElement(
-        ScrollView,
-        { style: { flex: 1, padding: 20 } },
-        React.createElement(
-          Text,
-          { style: { ...styles.title, color: theme.text } },
-          '👤 Account'
-        ),
-        React.createElement(
-          Text,
-          { style: { ...styles.description, color: theme.text } },
-          'Profile settings and account management'
-        ),
-        React.createElement(
-          View,
-          { style: { marginTop: 30, width: '100%' } },
-          React.createElement(
-            Text,
-            { style: { ...styles.description, color: theme.text, marginBottom: 10 } },
-            'Theme'
-          ),
-          React.createElement(
-            TouchableOpacity,
-            {
-              style: { ...styles.input, borderColor: theme.primary, justifyContent: 'space-between', flexDirection: 'row', alignItems: 'center' },
-              onPress: this.toggleThemeDropdown
-            },
-            React.createElement(
-              Text,
-              { style: { color: theme.text } },
-              selectedTheme === 1 ? 'Green Theme' : 'Nature Theme'
-            ),
-            React.createElement(
-              Text,
-              { style: { color: theme.text } },
-              '▼'
-            )
-          ),
-          showThemeDropdown ? React.createElement(
-            View,
-            { style: { ...styles.themeDropdown, position: 'relative', top: 0, right: 0, width: '100%' } },
-            React.createElement(
-              TouchableOpacity,
-              {
-                style: { ...styles.themeOption, backgroundColor: selectedTheme === 1 ? theme.tertiary : 'transparent' },
-                onPress: () => onSelectTheme(1)
-              },
-              React.createElement(
-                Text,
-                { style: { ...styles.themeText, fontWeight: selectedTheme === 1 ? 'bold' : 'normal' } },
-                'Green Theme'
-              )
-            ),
-            React.createElement(
-              TouchableOpacity,
-              {
-                style: { ...styles.themeOption, borderBottomWidth: 0, backgroundColor: selectedTheme === 2 ? theme.tertiary : 'transparent' },
-                onPress: () => onSelectTheme(2)
-              },
-              React.createElement(
-                Text,
-                { style: { ...styles.themeText, fontWeight: selectedTheme === 2 ? 'bold' : 'normal' } },
-                'Nature Theme'
-              )
-            )
-          ) : null
-        ),
-        React.createElement(
-          View,
-          { style: { marginTop: 20, width: '100%' } },
-          React.createElement(
-            Text,
-            { style: { ...styles.description, color: theme.text, marginBottom: 10 } },
-            'Current Location'
-          ),
-          React.createElement(
-            View,
-            { style: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 } },
-            React.createElement(
-              TextInput,
-              {
-                style: { ...styles.input, flex: 1, marginRight: 10, marginBottom: 0 },
-                placeholder: 'Latitude, Longitude',
-                value: location,
-                editable: false
-              }
-            ),
-            React.createElement(
-              TouchableOpacity,
-              {
-                style: { ...styles.button, backgroundColor: theme.primary, paddingHorizontal: 15, paddingVertical: 12 },
-                onPress: this.getCurrentLocation
-              },
-              React.createElement(
-                Text,
-                { style: { ...styles.buttonText, fontSize: 12 } },
-                'Get Location'
-              )
-            )
-          ),
-          React.createElement(
-            TextInput,
-            {
-              style: { ...styles.input, marginBottom: 10 },
-              placeholder: 'Barangay',
-              value: barangay,
-              onChangeText: (barangay: string) => this.setState({ barangay })
-            }
-          ),
-          React.createElement(
-            TextInput,
-            {
-              style: { ...styles.input, marginBottom: 10 },
-              placeholder: 'Municipality',
-              value: municipality,
-              onChangeText: (municipality: string) => this.setState({ municipality })
-            }
-          ),
-          React.createElement(
-            TextInput,
-            {
-              style: { ...styles.input, marginBottom: 10 },
-              placeholder: 'Province',
-              value: province,
-              onChangeText: (province: string) => this.setState({ province })
-            }
-          ),
-          React.createElement(
-            TextInput,
-            {
-              style: { ...styles.input, marginBottom: 0 },
-              placeholder: 'Region',
-              value: region,
-              onChangeText: (region: string) => this.setState({ region })
-            }
-          )
-        ),
-        React.createElement(
-          TouchableOpacity,
-          {
-            style: { ...styles.loginButton, backgroundColor: '#ff4444', marginTop: 30 },
-            onPress: onLogout
-          },
-          React.createElement(
-            Text,
-            { style: styles.buttonText },
-            'Logout'
-          )
-        )
-      )
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: theme.background }}>
+        <ScrollView style={{ flex: 1, padding: 20 }}>
+          <Text style={{ ...styles.title, color: theme.text }}>
+            👤 Account
+          </Text>
+          <Text style={{ ...styles.description, color: theme.text }}>
+            Profile settings and account management
+          </Text>
+          
+          <View style={{ marginTop: 30 }}>
+            <ThemeManager
+              selectedTheme={selectedTheme}
+              onSelectTheme={(themeId) => {
+                this.setState({ currentTheme: getTheme(themeId) });
+                onSelectTheme(themeId);
+              }}
+              theme={this.state.currentTheme}
+              styles={styles}
+              themesData={themes}
+            />
+          </View>
+
+          <View style={{ marginTop: 20, width: '100%' }}>
+            <Text style={{ ...styles.description, color: theme.text, marginBottom: 10 }}>
+              Current Location
+            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+              <TextInput
+                style={{ ...styles.input, flex: 1, marginRight: 10, marginBottom: 0 }}
+                placeholder="Latitude, Longitude"
+                value={location}
+                editable={false}
+              />
+              <TouchableOpacity
+                style={{ ...styles.button, backgroundColor: theme.primary, paddingHorizontal: 15, paddingVertical: 12 }}
+                onPress={this.getCurrentLocation}
+              >
+                <Text style={{ ...styles.buttonText, fontSize: 12 }}>
+                  Get Location
+                </Text>
+              </TouchableOpacity>
+            </View>
+            <TextInput
+              style={{ ...styles.input, marginBottom: 10 }}
+              placeholder="Barangay"
+              value={barangay}
+              onChangeText={(barangay: string) => this.setState({ barangay })}
+            />
+            <TextInput
+              style={{ ...styles.input, marginBottom: 10 }}
+              placeholder="Municipality"
+              value={municipality}
+              onChangeText={(municipality: string) => this.setState({ municipality })}
+            />
+            <TextInput
+              style={{ ...styles.input, marginBottom: 10 }}
+              placeholder="Province"
+              value={province}
+              onChangeText={(province: string) => this.setState({ province })}
+            />
+            <TextInput
+              style={{ ...styles.input, marginBottom: 0 }}
+              placeholder="Region"
+              value={region}
+              onChangeText={(region: string) => this.setState({ region })}
+            />
+          </View>
+
+          <TouchableOpacity
+            style={{ ...styles.loginButton, backgroundColor: '#ff4444', marginTop: 30 }}
+            onPress={onLogout}
+          >
+            <Text style={styles.buttonText}>
+              Logout
+            </Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </SafeAreaView>
     );
   }
 }

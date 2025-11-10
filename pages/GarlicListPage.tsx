@@ -1,32 +1,26 @@
-import * as React from 'react';
-import { SafeAreaView, View, Text } from 'react-native';
+import React, { Component } from 'react';
+import { SafeAreaView, ScrollView, View, Text } from 'react-native';
 
 interface GarlicListPageProps {
   theme: any;
   styles: any;
 }
 
-export class GarlicListPage extends React.Component<GarlicListPageProps> {
-  render(): React.ReactElement {
+export class GarlicListPage extends Component<GarlicListPageProps> {
+  render() {
     const { theme, styles } = this.props;
 
-    return React.createElement(
-      SafeAreaView,
-      { style: { flex: 1, backgroundColor: theme.background } },
-      React.createElement(
-        View,
-        { style: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 20 } },
-        React.createElement(
-          Text,
-          { style: { ...styles.title, color: theme.text } },
-          '🧄 Garlic List'
-        ),
-        React.createElement(
-          Text,
-          { style: { ...styles.description, color: theme.text } },
-          'Manage your garlic varieties and crops'
-        )
-      )
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: theme.background }}>
+        <ScrollView style={{ flex: 1, padding: 20 }}>
+          <Text style={{ ...styles.title, color: theme.text }}>
+            🧄 Garlic List
+          </Text>
+          <Text style={{ ...styles.description, color: theme.text }}>
+            Manage your garlic varieties and crops
+          </Text>
+        </ScrollView>
+      </SafeAreaView>
     );
   }
 }

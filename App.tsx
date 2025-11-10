@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { Text, View, StyleSheet, ViewStyle, TextStyle, TouchableOpacity, Image, TextInput, Modal, Animated, PermissionsAndroid, Platform } from 'react-native';
+import { Text, View, StyleSheet, ViewStyle, TextStyle, TouchableOpacity, Image, TextInput, Modal, Animated, PermissionsAndroid, Platform, Alert } from 'react-native';
 import * as ExpoSplashScreen from 'expo-splash-screen';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Svg, { Path } from 'react-native-svg';
@@ -8,6 +8,13 @@ import Login from './pages/authentication/login';
 import SplashScreen from './pages/splash/SplashScreen';
 import NetworkStatus from './components/NetworkStatus';
 import LocationPicker from './components/LocationPicker';
+import LocationDisplay from './components/LocationDisplay';
+import { SafeContainer } from './components/SafeContainer';
+import { HomePage } from './pages/HomePage';
+import { ForecastPage } from './pages/ForecastPage';
+import { GarlicListPage } from './pages/GarlicListPage';
+import { AccountPage } from './pages/AccountPage';
+import { themes, getTheme } from './components/ThemeManager';
 
 interface AppState {
   isLoading: boolean;
@@ -41,11 +48,24 @@ interface AppStyles {
   themeDropdown: ViewStyle;
   themeOption: ViewStyle;
   themeText: TextStyle;
+  tabText: TextStyle;
+  tabContainer: ViewStyle;
+  tab: ViewStyle;
+  input: ViewStyle;
+  loginButton: ViewStyle;
+  modalOverlay: ViewStyle;
+  modalContent: ViewStyle;
+  modalTitle: TextStyle;
+  modalText: TextStyle;
+  modalButton: ViewStyle;
+  errorLabel: TextStyle;
+  inputContainer: ViewStyle;
+  inputWrapper: ViewStyle;
+  inputIcon: ViewStyle;
 }
 
 class App extends React.Component<{}, AppState> {
   private readonly styles: AppStyles;
-  private readonly themes: any;
 
   constructor(props: {}) {
     super(props);
@@ -59,23 +79,6 @@ class App extends React.Component<{}, AppState> {
       activeTab: 0,
       hasSeenOnboarding: false,
       location: '',
-    };
-
-    this.themes = {
-      1: {
-        primary: '#B0DB9C',
-        secondary: '#CAE8BD',
-        tertiary: '#DDF6D2',
-        background: '#ECFAE5',
-        text: '#5D8736',
-      },
-      2: {
-        primary: '#5D8736',
-        secondary: '#809D3C',
-        tertiary: '#A9C46C',
-        background: '#F4FFC3',
-        text: '#5D8736',
-      },
     };
 
     this.styles = StyleSheet.create({
@@ -252,7 +255,7 @@ class App extends React.Component<{}, AppState> {
         borderTopWidth: 1,
         borderTopColor: '#eee',
         paddingVertical: 10,
-        marginBottom: 5,
+        paddingBottom: 30,
       } as ViewStyle,
       tab: {
         flex: 1,
@@ -273,11 +276,22 @@ class App extends React.Component<{}, AppState> {
         top: 15,
         zIndex: 1,
       } as ViewStyle,
+      splashContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: '#ECFAE5',
+      } as ViewStyle,
+      splashIcon: {
+        width: 120,
+        height: 120,
+      } as ViewStyle,
     });
   }
 
   public async componentDidMount(): Promise<void> {
     await ExpoSplashScreen.preventAutoHideAsync();
+    await this.requestLocationPermission();
     const hasSeenOnboarding = await AsyncStorage.getItem('hasSeenOnboarding');
     setTimeout(() => {
       this.setState({ 
@@ -335,12 +349,12 @@ class App extends React.Component<{}, AppState> {
   };
 
   private getCurrentTheme = () => {
-    return this.themes[this.state.selectedTheme];
+    return getTheme(this.state.selectedTheme);
   };
 
-  private handleLogin = (): void => {
+  private handleLogin = async (): Promise<void> => {
+    await this.requestLocationPermission();
     this.setState({ showDashboard: true });
-    this.requestLocationPermission();
   };
 
   private selectTab = (tabIndex: number): void => {
@@ -356,17 +370,26 @@ class App extends React.Component<{}, AppState> {
   };
 
   private requestLocationPermission = async (): Promise<void> => {
-    if (Platform.OS === 'android') {
-      const granted = await PermissionsAndroid.request(
-        PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION
-      );
-      if (granted === PermissionsAndroid.RESULTS.GRANTED) {
-        this.getCurrentLocation();
+    try {
+      if (Platform.OS === 'android') {
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+          {
+            title: 'Location Permission',
+            message: 'This app needs access to your location to show weather data.',
+            buttonNeutral: 'Ask Me Later',
+            buttonNegative: 'Cancel',
+            buttonPositive: 'OK',
+          }
+        );
+        if (granted === PermissionsAndroid.RESULTS.GRANTED) {
+          this.getCurrentLocation();
+        }
       } else {
-        console.log('Location permission denied');
+        this.getCurrentLocation();
       }
-    } else {
-      this.getCurrentLocation();
+    } catch (err) {
+      console.warn(err);
     }
   };
 
@@ -388,197 +411,9 @@ class App extends React.Component<{}, AppState> {
     }
   };
 
-  private renderTabContent(): React.ReactElement {
-    const currentTheme = this.getCurrentTheme();
-    const { activeTab } = this.state;
 
-    switch (activeTab) {
-      case 0:
-        return React.createElement(
-          View,
-          { style: { flex: 1, alignItems: 'center', justifyContent: 'center' } },
-          React.createElement(
-            Text,
-            { style: { ...this.styles.title, color: currentTheme.text } },
-            '🏠 Home'
-          ),
-          React.createElement(
-            Text,
-            { style: { ...this.styles.description, color: currentTheme.text } },
-            'Welcome to your garlic farming dashboard!'
-          )
-        );
-      case 1:
-        return React.createElement(
-          View,
-          { style: { flex: 1, alignItems: 'center', justifyContent: 'center' } },
-          React.createElement(
-            Text,
-            { style: { ...this.styles.title, color: currentTheme.text } },
-            '🌤️ Forecast'
-          ),
-          React.createElement(
-            Text,
-            { style: { ...this.styles.description, color: currentTheme.text } },
-            'Weather forecast and farming recommendations'
-          )
-        );
-      case 2:
-        return React.createElement(
-          View,
-          { style: { flex: 1, alignItems: 'center', justifyContent: 'center' } },
-          React.createElement(
-            Text,
-            { style: { ...this.styles.title, color: currentTheme.text } },
-            '🧄 Garlic List'
-          ),
-          React.createElement(
-            Text,
-            { style: { ...this.styles.description, color: currentTheme.text } },
-            'Manage your garlic varieties and crops'
-          )
-        );
-      case 3:
-        return React.createElement(
-          View,
-          { style: { flex: 1, alignItems: 'center', justifyContent: 'center' } },
-          React.createElement(
-            Text,
-            { style: { ...this.styles.title, color: currentTheme.text } },
-            '👤 Account'
-          ),
-          React.createElement(
-            Text,
-            { style: { ...this.styles.description, color: currentTheme.text } },
-            'Profile settings and account management'
-          ),
-          React.createElement(
-            View,
-            { style: { marginTop: 30, width: '80%' } },
-            React.createElement(
-              Text,
-              { style: { ...this.styles.description, color: currentTheme.text, marginBottom: 10 } },
-              'Theme'
-            ),
-            React.createElement(
-              TouchableOpacity,
-              {
-                style: { ...this.styles.input, borderColor: currentTheme.primary, justifyContent: 'space-between', flexDirection: 'row', alignItems: 'center' },
-                onPress: this.toggleThemeDropdown
-              },
-              React.createElement(
-                Text,
-                { style: { color: currentTheme.text } },
-                this.state.selectedTheme === 1 ? 'Green Theme' : 'Nature Theme'
-              ),
-              React.createElement(
-                Text,
-                { style: { color: currentTheme.text } },
-                '▼'
-              )
-            ),
-            this.state.showThemeDropdown ? React.createElement(
-              View,
-              { style: { ...this.styles.themeDropdown, position: 'relative', top: 0, right: 0, width: '100%' } },
-              React.createElement(
-                TouchableOpacity,
-                {
-                  style: { ...this.styles.themeOption, backgroundColor: this.state.selectedTheme === 1 ? currentTheme.tertiary : 'transparent' },
-                  onPress: () => this.selectTheme(1)
-                },
-                React.createElement(
-                  Text,
-                  { style: { ...this.styles.themeText, fontWeight: this.state.selectedTheme === 1 ? 'bold' : 'normal' } },
-                  'Green Theme'
-                )
-              ),
-              React.createElement(
-                TouchableOpacity,
-                {
-                  style: { ...this.styles.themeOption, borderBottomWidth: 0, backgroundColor: this.state.selectedTheme === 2 ? currentTheme.tertiary : 'transparent' },
-                  onPress: () => this.selectTheme(2)
-                },
-                React.createElement(
-                  Text,
-                  { style: { ...this.styles.themeText, fontWeight: this.state.selectedTheme === 2 ? 'bold' : 'normal' } },
-                  'Nature Theme'
-                )
-              )
-            ) : null
-          ),
-          React.createElement(
-            View,
-            { style: { marginTop: 20, width: '80%' } },
-            React.createElement(LocationPicker, {
-              theme: currentTheme,
-              onLocationChange: (locationData) => {
-                this.setState({ location: locationData.coordinates });
-              }
-            })
-          ),
-          React.createElement(
-            TouchableOpacity,
-            {
-              style: { ...this.styles.loginButton, backgroundColor: '#ff4444', marginTop: 30 },
-              onPress: this.handleLogout
-            },
-            React.createElement(
-              Text,
-              { style: this.styles.buttonText },
-              'Logout'
-            )
-          )
-        );
-      default:
-        return React.createElement(View);
-    }
-  }
 
-  private renderDashboard(): React.ReactElement {
-    const currentTheme = this.getCurrentTheme();
-    const tabs = [
-      { icon: '🏠', label: 'Home' },
-      { icon: '🌤️', label: 'Forecast' },
-      { icon: '🧄', label: 'Garlic List' },
-      { icon: '👤', label: 'Account' }
-    ];
-    
-    return React.createElement(
-      View,
-      { style: { ...this.styles.container, backgroundColor: currentTheme.background } },
-      this.renderTabContent(),
-      React.createElement(
-        View,
-        { style: { ...this.styles.tabContainer, backgroundColor: currentTheme.tertiary } },
-        ...tabs.map((tab, index) =>
-          React.createElement(
-            TouchableOpacity,
-            {
-              key: index,
-              style: this.styles.tab,
-              onPress: () => this.selectTab(index)
-            },
-            React.createElement(
-              Text,
-              { style: { fontSize: 20 } },
-              tab.icon
-            ),
-            React.createElement(
-              Text,
-              { 
-                style: { 
-                  ...this.styles.tabText, 
-                  color: this.state.activeTab === index ? currentTheme.primary : currentTheme.text 
-                } 
-              },
-              tab.label
-            )
-          )
-        )
-      ),
-      React.createElement(StatusBar, { style: 'auto' })
-    );
-  }
+
 
   private renderThemeSelector(): React.ReactElement {
     const currentTheme = this.getCurrentTheme();
@@ -713,6 +548,91 @@ class App extends React.Component<{}, AppState> {
     );
   }
 
+  private renderTabContent(): React.ReactElement {
+    const currentTheme = this.getCurrentTheme();
+    const { activeTab } = this.state;
+    const tabHeight = 10 * 2 + 30 + 60;
+
+    switch (activeTab) {
+      case 0:
+        return React.createElement(HomePage, {
+          theme: currentTheme,
+          styles: this.styles,
+          tabHeight: tabHeight
+        });
+      case 1:
+        return React.createElement(ForecastPage, {
+          theme: currentTheme,
+          styles: this.styles
+        });
+      case 2:
+        return React.createElement(GarlicListPage, {
+          theme: currentTheme,
+          styles: this.styles
+        });
+      case 3:
+        return React.createElement(AccountPage, {
+          theme: currentTheme,
+          styles: this.styles,
+          selectedTheme: this.state.selectedTheme,
+          onSelectTheme: this.selectTheme,
+          onLogout: this.handleLogout
+        });
+      default:
+        return React.createElement(View);
+    }
+  }
+
+  private renderDashboard(): React.ReactElement {
+    const currentTheme = this.getCurrentTheme();
+    const tabs = [
+      { icon: '🏠', label: 'Home' },
+      { icon: '🌤️', label: 'Forecast' },
+      { icon: '🧄', label: 'Garlic List' },
+      { icon: '👤', label: 'Account' }
+    ];
+    
+    return React.createElement(
+      View,
+      { style: { ...this.styles.container, backgroundColor: currentTheme.background } },
+      React.createElement(
+        View,
+        { style: { flex: 1 } },
+        this.renderTabContent()
+      ),
+      React.createElement(
+        View,
+        { style: { ...this.styles.tabContainer, backgroundColor: currentTheme.tertiary } },
+        ...tabs.map((tab, index) =>
+          React.createElement(
+            TouchableOpacity,
+            {
+              key: index,
+              style: this.styles.tab,
+              onPress: () => this.selectTab(index)
+            },
+            React.createElement(
+              Text,
+              { style: { fontSize: 20 } },
+              tab.icon
+            ),
+            React.createElement(
+              Text,
+              { 
+                style: { 
+                  ...this.styles.tabText, 
+                  color: this.state.activeTab === index ? currentTheme.primary : currentTheme.text 
+                } 
+              },
+              tab.label
+            )
+          )
+        )
+      ),
+      React.createElement(StatusBar, { style: 'auto' })
+    );
+  }
+
   public render(): React.ReactElement {
     let mainContent;
     
@@ -727,10 +647,13 @@ class App extends React.Component<{}, AppState> {
     }
 
     return React.createElement(
-      View,
-      { style: { flex: 1 } },
-      mainContent,
-      React.createElement(NetworkStatus)
+      SafeContainer,
+      { 
+        children: [
+          React.createElement(React.Fragment, { key: 'main' }, mainContent),
+          React.createElement(NetworkStatus, { key: 'network' })
+        ]
+      }
     );
   }
 }
