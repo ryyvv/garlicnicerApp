@@ -26,6 +26,7 @@ interface AppState {
   activeTab: number;
   hasSeenOnboarding: boolean;
   location: string;
+  isCameraActive: boolean;
 }
 
 interface AppStyles {
@@ -79,6 +80,7 @@ class App extends React.Component<{}, AppState> {
       activeTab: 0,
       hasSeenOnboarding: false,
       location: '',
+      isCameraActive: false,
     };
 
     this.styles = StyleSheet.create({
@@ -361,6 +363,10 @@ class App extends React.Component<{}, AppState> {
     this.setState({ activeTab: tabIndex });
   };
 
+  private handleCameraStateChange = (isActive: boolean): void => {
+    this.setState({ isCameraActive: isActive });
+  };
+
   private handleLogout = (): void => {
     this.setState({ 
       showDashboard: false, 
@@ -569,7 +575,8 @@ class App extends React.Component<{}, AppState> {
       case 2:
         return React.createElement(GarlicListPage, {
           theme: currentTheme,
-          styles: this.styles
+          styles: this.styles,
+          onCameraStateChange: this.handleCameraStateChange
         });
       case 3:
         return React.createElement(AccountPage, {
@@ -601,7 +608,7 @@ class App extends React.Component<{}, AppState> {
         { style: { flex: 1 } },
         this.renderTabContent()
       ),
-      React.createElement(
+      !this.state.isCameraActive ? React.createElement(
         View,
         { style: { ...this.styles.tabContainer, backgroundColor: currentTheme.tertiary } },
         ...tabs.map((tab, index) =>
@@ -629,7 +636,7 @@ class App extends React.Component<{}, AppState> {
             )
           )
         )
-      ),
+      ) : null,
       React.createElement(StatusBar, { style: 'auto' })
     );
   }

@@ -66,21 +66,10 @@ export class HourlyForecast extends Component<HourlyForecastProps> {
     return `${displayHour} ${period}`;
   };
 
-  
-  // getIconNumber = (iconUrl: string) => {
-  //   const match = iconUrl.match(/(\d+)\.png/);
-  //     console.log("match: ",match)
-      
-  //   if (match && match[1]) {
-  //     // console.log("match: ",match)
-  //     // console.log("Matching: ",match[1])
-  //     return match[1];
-  //   }
-  // };
 
   // Helper function to map icon number or name to imported images
 getIconImage = (iconUrl: string) => {
-  console.log("iconUrl: ", iconUrl)
+  // console.log("iconUrl: ", iconUrl)
   
   const match = iconUrl.match(/(\d+)\.png/); // Match numbers in icon URLs
   if (match && match[1]) {
@@ -146,7 +135,7 @@ getIconImage = (iconUrl: string) => {
           {sortedHourlyData.map((hour: any, index: number) => {
             const isFirst = index === 0;
             const count = index + 1;
-            console.log(count);
+            // console.log(count);
             return (
               <View
                 key={index}

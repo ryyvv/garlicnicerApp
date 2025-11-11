@@ -3,6 +3,7 @@ import { ScrollView, View, Text, StyleSheet, Image } from 'react-native';
 import { LocationStorage } from '../utils/LocationStorage';
 import { SafeContainer } from '../components/SafeContainer'; 
 import { SavedLocation } from '../utils/LocationStorage';
+
 interface ForecastPageProps {
   theme: any;
   styles: any;

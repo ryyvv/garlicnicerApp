@@ -51,7 +51,7 @@ interface WeatherCardProps {
 
 export class WeatherCard extends Component<WeatherCardProps> {
   getIconImage = (iconUrl: string) => {
-  console.log("iconUrl: ", iconUrl)
+  // console.log("iconUrl: ", iconUrl)
   
   const match = iconUrl.match(/(\d+)\.png/); // Match numbers in icon URLs
   if (match && match[1]) {

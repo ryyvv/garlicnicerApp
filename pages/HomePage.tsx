@@ -48,13 +48,13 @@ export class HomePage extends Component<HomePageProps, HomePageState> {
   private initializeApp = async (): Promise<void> => {
     try {
       const savedLocations = await LocationStorage.getSavedLocations();
-      console.log('Saved locations on app start:', savedLocations);
+      // console.log('Saved locations on app start:', savedLocations);
       
       if (savedLocations.length === 0) {
-        console.log('No saved locations - first time user');
+        // console.log('No saved locations - first time user');
         await this.getCurrentLocation();
       } else {
-        console.log('Existing user - loading default location');
+        // console.log('Existing user - loading default location');
         await this.loadDefaultLocation();
       }
       
@@ -68,9 +68,9 @@ export class HomePage extends Component<HomePageProps, HomePageState> {
   private loadDefaultLocation = async (): Promise<void> => {
     try {
       const defaultLocation = await LocationStorage.getDefaultLocation();
-      console.log('Loading default location from storage:', defaultLocation);
+      // console.log('Loading default location from storage:', defaultLocation);
       if (defaultLocation) {
-        console.log('Using default location for main weather display:', defaultLocation.city);
+        // console.log('Using default location for main weather display:', defaultLocation.city);
         this.setState({ 
           municipality: defaultLocation.city,
           defaultLocation: defaultLocation
@@ -147,7 +147,7 @@ export class HomePage extends Component<HomePageProps, HomePageState> {
         });
         
         // Save current location as default for first-time users
-        console.log('Saving current GPS location as default');
+        // console.log('Saving current GPS location as default');
         const currentLocationData = {
           city: municipality,
           province: addr.region || 'Unknown',
@@ -159,7 +159,7 @@ export class HomePage extends Component<HomePageProps, HomePageState> {
         const savedLocation = await LocationStorage.getSavedLocations();
         if (savedLocation.length > 0) {
           await LocationStorage.setDefaultLocation(savedLocation[0].id);
-          console.log('Current GPS location saved as default:', currentLocationData);
+          // console.log('Current GPS location saved as default:', currentLocationData);
         }
       }
       
