@@ -53,6 +53,7 @@ class Login extends React.Component<LoginProps, LoginState> {
   private readonly themes: any;
   private emailShakeAnimation: Animated.Value;
   private passwordShakeAnimation: Animated.Value;
+  private netInfoUnsubscribe?: () => void;
 
   constructor(props: LoginProps) {
     super(props);
@@ -198,7 +199,7 @@ class Login extends React.Component<LoginProps, LoginState> {
     const netInfo = await NetInfo.fetch();
     this.setState({ isOffline: !netInfo.isConnected });
     
-    const unsubscribe = NetInfo.addEventListener(state => {
+    this.netInfoUnsubscribe = NetInfo.addEventListener(state => {
       this.setState({ isOffline: !state.isConnected });
     });
 
@@ -207,8 +208,12 @@ class Login extends React.Component<LoginProps, LoginState> {
       const { email } = JSON.parse(savedCredentials);
       this.setState({ email, rememberMe: true });
     }
+  }
 
-    return () => unsubscribe();
+  public componentWillUnmount(): void {
+    if (this.netInfoUnsubscribe) {
+      this.netInfoUnsubscribe();
+    }
   }
 
   private handleLogin = async (): Promise<void> => {
@@ -253,14 +258,18 @@ class Login extends React.Component<LoginProps, LoginState> {
     this.setState({ loading: true, emailError: false, passwordError: false });
 
     try {
+      let userCredential;
       if (isSignUp) {
-        await createUserWithEmailAndPassword(auth, email, password);
+        userCredential = await createUserWithEmailAndPassword(auth, email, password);
       } else {
-        await signInWithEmailAndPassword(auth, email, password);
+        userCredential = await signInWithEmailAndPassword(auth, email, password);
       }
       
+      const userUid = userCredential.user.uid;
+      console.log('User UID:', userUid);
+      
       if (rememberMe) {
-        await AsyncStorage.setItem('savedCredentials', JSON.stringify({ email, password }));
+        await AsyncStorage.setItem('savedCredentials', JSON.stringify({ email, password, userUid }));
       }
       
       this.props.onLogin();

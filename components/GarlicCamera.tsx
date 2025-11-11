@@ -132,8 +132,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   focusSquare: {
-    width: 250,
-    height: 250,
+    width: 320,
+    height: 320,
     position: 'relative',
   },
   corner: {
@@ -251,7 +251,7 @@ const styles = StyleSheet.create({
   },
   instructionsBottom: {
     position: 'absolute',
-    bottom: 150,
+    bottom: 100,
     left: 20,
     right: 20,
     alignItems: 'center',

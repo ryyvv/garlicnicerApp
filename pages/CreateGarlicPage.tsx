@@ -5,6 +5,8 @@ import { SafeContainer } from '../components/SafeContainer';
 import { GarlicCamera } from '../components/GarlicCamera';
 import { Calendar } from 'react-native-calendars';
 import { LocationStorage, SavedLocation } from '../utils/LocationStorage';
+import { GarlicPlantStorage } from '../utils/GarlicPlantStorage';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 
 
@@ -15,6 +17,7 @@ interface CreateGarlicPageProps {
   onSave?: (garlicData: any) => void;
   savedLocations?: string[];
   onCameraStateChange?: (isActive: boolean) => void;
+  useruid?: string;
 }
 
 interface CreateGarlicPageState {
@@ -78,7 +81,7 @@ export class CreateGarlicPage extends Component<CreateGarlicPageProps, CreateGar
   };
 
   private validateForm = (): boolean => {
-    const { title, varietyName, selectedLocation, dateSetup, alreadyPlanted, datePlanted } = this.state;
+    const { title, varietyName, selectedLocation, dateSetup, alreadyPlanted, datePlanted, imageUri } = this.state;
     
     if (!title.trim()) {
       Alert.alert('Validation Error', 'Title is required');
@@ -86,6 +89,10 @@ export class CreateGarlicPage extends Component<CreateGarlicPageProps, CreateGar
     }
     if (!varietyName.trim()) {
       Alert.alert('Validation Error', 'Variety name is required');
+      return false;
+    }
+    if (!imageUri) {
+      Alert.alert('Validation Error', 'Plant image is required');
       return false;
     }
     if (!selectedLocation) {
@@ -168,26 +175,51 @@ export class CreateGarlicPage extends Component<CreateGarlicPageProps, CreateGar
     }
   };
 
-  private handleSave = (): void => {
+  private getImageFilename = (uri: string): string => {
+    return uri.split('/').pop() || '';
+  };
+
+
+
+  private handleSave = async (): Promise<void> => {
     if (!this.validateForm()) {
       return;
     }
 
     console.log('Validation passed! Saving garlic data...');
     
-    const { onSave, onBack } = this.props;
+    const { onBack } = this.props;
+    const { title, varietyName, dateSetup, alreadyPlanted, datePlanted, selectedLocation, imageUri } = this.state;
+
+    const savedCredentials = await AsyncStorage.getItem('savedCredentials');
+    let userUid = null;
+    if (savedCredentials) {
+      const parsed = JSON.parse(savedCredentials);
+      userUid = parsed.userUid;
+    }
+    
     const garlicData = {
-      ...this.state,
       id: Date.now().toString(),
+      userUid,
+      title,
+      varietyName,
+      dateSetup,
+      alreadyPlanted,
+      datePlanted,
+      location: selectedLocation,
+      imageFilename: this.getImageFilename(imageUri),
+      imageUri,
       status: 'planted'
     };
     
-    console.log('Garlic data:', garlicData);
-    
-    if (onSave) {
-      onSave(garlicData);
+    try {
+      await GarlicPlantStorage.saveGarlicPlant(garlicData);
+      console.log('Garlic data saved successfully');
+      onBack();
+    } catch (error) {
+      console.error('Failed to save garlic data:', error);
+      Alert.alert('Error', 'Failed to save garlic plant data');
     }
-    onBack();
   };
 
   render() {
@@ -218,6 +250,9 @@ export class CreateGarlicPage extends Component<CreateGarlicPageProps, CreateGar
           style={{ flex: 1, padding: 20 }}
           contentContainerStyle={{ paddingBottom: 100 }}
         >
+
+          
+
           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 20 }}>
             <TouchableOpacity onPress={onBack} style={{ marginRight: 15 }}>
               <Text style={{ fontSize: 24, color: theme.text }}>←</Text>
@@ -228,6 +263,20 @@ export class CreateGarlicPage extends Component<CreateGarlicPageProps, CreateGar
           </View>
 
           <View style={createStyles.formContainer}>
+
+            <Text style={[createStyles.label, { color: theme.text }]}>Plant Image</Text>
+            <TouchableOpacity
+              style={[createStyles.imageUpload, { borderColor: theme.primary }]}
+              onPress={this.handleImagePicker}
+            >
+              {imageUri ? (
+                <Image source={{ uri: imageUri }} style={createStyles.uploadedImage} />
+              ) : (
+                <View style={createStyles.imagePlaceholder}>
+                  <Text style={[createStyles.imagePlaceholderText, { color: theme.text + '80' }]}>📷 Add Photo</Text>
+                </View>
+              )}
+            </TouchableOpacity>
             <Text style={[createStyles.label, { color: theme.text }]}>Title of Garlic Plant</Text>
             <TextInput
               style={[createStyles.input, { borderColor: theme.primary, color: theme.text }]}
@@ -246,19 +295,7 @@ export class CreateGarlicPage extends Component<CreateGarlicPageProps, CreateGar
               placeholderTextColor={theme.text + '80'}
             />
 
-            <Text style={[createStyles.label, { color: theme.text }]}>Plant Image</Text>
-            <TouchableOpacity
-              style={[createStyles.imageUpload, { borderColor: theme.primary }]}
-              onPress={this.handleImagePicker}
-            >
-              {imageUri ? (
-                <Image source={{ uri: imageUri }} style={createStyles.uploadedImage} />
-              ) : (
-                <View style={createStyles.imagePlaceholder}>
-                  <Text style={[createStyles.imagePlaceholderText, { color: theme.text + '80' }]}>📷 Add Photo</Text>
-                </View>
-              )}
-            </TouchableOpacity>
+           
 
             <Text style={[createStyles.label, { color: theme.text }]}>Saved Location</Text>
             <TouchableOpacity
@@ -583,7 +620,7 @@ const createStyles = StyleSheet.create({
     fontSize: 16,
   },
   imageUpload: {
-    height: 120,
+    height: 320,
     borderWidth: 2,
     borderStyle: 'dashed',
     borderRadius: 8,

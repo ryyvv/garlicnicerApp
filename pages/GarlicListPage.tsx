@@ -1,7 +1,10 @@
 import React, { Component } from 'react';
-import { ScrollView, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Image, Alert } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeContainer } from '../components/SafeContainer';
 import { CreateGarlicPage } from './CreateGarlicPage';
+import { GarlicDetailPage } from './GarlicDetailPage';
+import { GarlicPlantData } from '../utils/GarlicPlantStorage';
 
 interface GarlicListPageProps {
   theme: any;
@@ -12,6 +15,9 @@ interface GarlicListPageProps {
 interface GarlicListPageState {
   loading: boolean;
   showCreatePage: boolean;
+  showDetailPage: boolean;
+  selectedPlant: GarlicPlantData | null;
+  garlicPlants: GarlicPlantData[];
 }
 
 export class GarlicListPage extends Component<GarlicListPageProps, GarlicListPageState> {
@@ -19,7 +25,10 @@ export class GarlicListPage extends Component<GarlicListPageProps, GarlicListPag
     super(props);
     this.state = {
       loading: false,
-      showCreatePage: false
+      showCreatePage: false,
+      showDetailPage: false,
+      selectedPlant: null,
+      garlicPlants: []
     };
   }
 
@@ -29,11 +38,59 @@ export class GarlicListPage extends Component<GarlicListPageProps, GarlicListPag
 
   private handleBackFromCreate = (): void => {
     this.setState({ showCreatePage: false });
+    this.loadGarlicPlants();
+  };
+
+  private handlePlantPress = (plant: GarlicPlantData): void => {
+    this.setState({ selectedPlant: plant, showDetailPage: true });
+  };
+
+  private handleBackFromDetail = (): void => {
+    this.setState({ showDetailPage: false, selectedPlant: null });
+  };
+
+  async componentDidMount() {
+    this.loadGarlicPlants();
+  }
+
+  private loadGarlicPlants = async (): Promise<void> => {
+    try {
+      const data = await AsyncStorage.getItem('garlicPlants');
+      if (data) {
+        const garlicPlants = JSON.parse(data);
+        this.setState({ garlicPlants });
+      }
+    } catch (error) {
+      console.error('Failed to load garlic plants:', error);
+    }
+  };
+
+  private deleteGarlicPlant = async (id: string): Promise<void> => {
+    Alert.alert(
+      'Delete Garlic Plant',
+      'Are you sure you want to delete this garlic plant?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const updatedPlants = this.state.garlicPlants.filter(plant => plant.id !== id);
+              await AsyncStorage.setItem('garlicPlants', JSON.stringify(updatedPlants));
+              this.setState({ garlicPlants: updatedPlants });
+            } catch (error) {
+              console.error('Failed to delete garlic plant:', error);
+            }
+          }
+        }
+      ]
+    );
   };
 
   render() {
     const { theme, styles } = this.props;
-    const { showCreatePage } = this.state;
+    const { showCreatePage, showDetailPage, selectedPlant } = this.state;
 
     if (showCreatePage) {
       return (
@@ -42,6 +99,17 @@ export class GarlicListPage extends Component<GarlicListPageProps, GarlicListPag
           styles={styles}
           onBack={this.handleBackFromCreate}
           onCameraStateChange={this.props.onCameraStateChange}
+        />
+      );
+    }
+
+    if (showDetailPage && selectedPlant) {
+      return (
+        <GarlicDetailPage
+          theme={theme}
+          styles={styles}
+          plant={selectedPlant}
+          onBack={this.handleBackFromDetail}
         />
       );
     }
@@ -55,6 +123,44 @@ export class GarlicListPage extends Component<GarlicListPageProps, GarlicListPag
           <Text style={{ ...styles.description, color: theme.text }}>
             Manage your garlic varieties and crops
           </Text>
+          
+          {this.state.garlicPlants.map((plant) => (
+            <TouchableOpacity 
+              key={plant.id} 
+              style={[garlicCardStyles.card, { backgroundColor: theme.tertiary }]}
+              onPress={() => this.handlePlantPress(plant)}
+            >
+              <View style={garlicCardStyles.imageContainer}>
+                {plant.imageUri ? (
+                  <Image source={{ uri: plant.imageUri }} style={garlicCardStyles.plantImage} />
+                ) : (
+                  <View style={[garlicCardStyles.imagePlaceholder, { backgroundColor: theme.primary + '20' }]}>
+                    <Text style={{ fontSize: 30 }}>🧄</Text>
+                  </View>
+                )}
+              </View>
+              
+              <View style={garlicCardStyles.titleContainer}>
+                <Text style={[garlicCardStyles.title, { color: theme.text }]}>{plant.title}</Text>
+                <Text style={[garlicCardStyles.variety, { color: theme.text + '80' }]}>{plant.varietyName}</Text>
+                  <Text style={[garlicCardStyles.statusText, { color: plant.synced ? '#4CAF50' : '#FF9800' }]}>
+                  {plant.synced ? 'Online' : 'Offline'}
+                </Text>
+              </View>
+              
+          
+              
+              <TouchableOpacity 
+                style={garlicCardStyles.deleteButton}
+                onPress={(e) => {
+                  e.stopPropagation();
+                  this.deleteGarlicPlant(plant.id);
+                }}
+              >
+                <Text style={garlicCardStyles.deleteIcon}>🗑️</Text>
+              </TouchableOpacity>
+            </TouchableOpacity>
+          ))}
         </ScrollView>
         
         <TouchableOpacity 
@@ -68,10 +174,73 @@ export class GarlicListPage extends Component<GarlicListPageProps, GarlicListPag
   }
 }
 
+const garlicCardStyles = StyleSheet.create({
+  card: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 15,
+    marginVertical: 8,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  imageContainer: {
+    marginRight: 15,
+  },
+  imagePlaceholder: {
+    width: 60,
+    height: 60,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  plantImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 8,
+  },
+  titleContainer: {
+    flex: 1,
+  },
+  title: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  variety: {
+    fontSize: 14,
+  },
+  statusContainer: {
+    alignItems: 'center',
+    marginRight: 15,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0,0,0,0.1)',
+  },
+  statusIcon: {
+    fontSize: 16,
+    marginBottom: 2,
+  },
+  statusText: {
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+  deleteButton: {
+    padding: 8,
+  },
+  deleteIcon: {
+    fontSize: 20,
+  },
+});
+
 const floatingButtonStyles = StyleSheet.create({
   fab: {
     position: 'absolute',
-    bottom: 100,
+    bottom: 200,
     right: 20,
     width: 56,
     height: 56,
