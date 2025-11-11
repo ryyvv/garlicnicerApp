@@ -563,7 +563,8 @@ class App extends React.Component<{}, AppState> {
       case 1:
         return React.createElement(ForecastPage, {
           theme: currentTheme,
-          styles: this.styles
+          styles: this.styles,
+          tabHeight: tabHeight
         });
       case 2:
         return React.createElement(GarlicListPage, {
