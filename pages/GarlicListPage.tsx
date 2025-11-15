@@ -1,6 +1,7 @@
 import React, { Component } from 'react';
 import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Image, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import NetInfo from '@react-native-community/netinfo';
 import { SafeContainer } from '../components/SafeContainer';
 import { CreateGarlicPage } from './CreateGarlicPage';
 import { GarlicDetailPage } from './GarlicDetailPage';
@@ -88,6 +89,31 @@ export class GarlicListPage extends Component<GarlicListPageProps, GarlicListPag
     );
   };
 
+  private reuploadOfflineData = async (): Promise<void> => {
+    const netInfo = await NetInfo.fetch();
+    if (!netInfo.isConnected) {
+      Alert.alert('No Internet', 'Please connect to internet to reupload data');
+      return;
+    }
+
+    const offlinePlants = this.state.garlicPlants.filter(plant => !plant.synced);
+    if (offlinePlants.length === 0) {
+      Alert.alert('No Data', 'No offline data to upload');
+      return;
+    }
+
+    try {
+      const updatedPlants = this.state.garlicPlants.map(plant => 
+        plant.synced ? plant : { ...plant, synced: true }
+      );
+      await AsyncStorage.setItem('garlicPlants', JSON.stringify(updatedPlants));
+      this.setState({ garlicPlants: updatedPlants });
+      Alert.alert('Success', `${offlinePlants.length} items uploaded successfully`);
+    } catch (error) {
+      Alert.alert('Error', 'Failed to upload offline data');
+    }
+  };
+
   render() {
     const { theme, styles } = this.props;
     const { showCreatePage, showDetailPage, selectedPlant } = this.state;
@@ -143,7 +169,7 @@ export class GarlicListPage extends Component<GarlicListPageProps, GarlicListPag
               <View style={garlicCardStyles.titleContainer}>
                 <Text style={[garlicCardStyles.title, { color: theme.text }]}>{plant.title}</Text>
                 <Text style={[garlicCardStyles.variety, { color: theme.text + '80' }]}>{plant.varietyName}</Text>
-                  <Text style={[garlicCardStyles.statusText, { color: plant.synced ? '#4CAF50' : '#FF9800' }]}>
+                <Text style={[garlicCardStyles.statusText, { color: plant.synced ? '#4CAF50' : '#FF9800' }]}>
                   {plant.synced ? 'Online' : 'Offline'}
                 </Text>
               </View>
@@ -162,6 +188,15 @@ export class GarlicListPage extends Component<GarlicListPageProps, GarlicListPag
             </TouchableOpacity>
           ))}
         </ScrollView>
+        
+        {this.state.garlicPlants.some(plant => !plant.synced) && (
+          <TouchableOpacity 
+            style={[floatingButtonStyles.reuploadButton, { backgroundColor: '#FF9800' }]}
+            onPress={this.reuploadOfflineData}
+          >
+            <Text style={floatingButtonStyles.reuploadText}>↑</Text>
+          </TouchableOpacity>
+        )}
         
         <TouchableOpacity 
           style={[floatingButtonStyles.fab, { backgroundColor: theme.primary }]}
@@ -256,6 +291,26 @@ const floatingButtonStyles = StyleSheet.create({
   fabText: {
     color: '#fff',
     fontSize: 24,
+    fontWeight: 'bold',
+  },
+  reuploadButton: {
+    position: 'absolute',
+    bottom: 270,
+    right: 20,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 8,
+  },
+  reuploadText: {
+    color: '#fff',
+    fontSize: 20,
     fontWeight: 'bold',
   },
 });

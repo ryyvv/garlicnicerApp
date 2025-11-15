@@ -1,13 +1,16 @@
 import React, { Component } from 'react';
 import { View, Text, TouchableOpacity, TextInput, StyleSheet, ScrollView, Switch, Modal, Image, Alert } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import NetInfo from '@react-native-community/netinfo';
 import { SafeContainer } from '../components/SafeContainer';
 import { GarlicCamera } from '../components/GarlicCamera';
 import { Calendar } from 'react-native-calendars';
 import { LocationStorage, SavedLocation } from '../utils/LocationStorage';
 import { GarlicPlantStorage } from '../utils/GarlicPlantStorage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import NetworkStatus from '../components/NetworkStatus';
 
+const API_BASE_URL = process.env.API_BASE_URL || 'http://192.168.8.132:8000';
 
 
 interface CreateGarlicPageProps {
@@ -186,39 +189,102 @@ export class CreateGarlicPage extends Component<CreateGarlicPageProps, CreateGar
       return;
     }
 
-    console.log('Validation passed! Saving garlic data...');
+    const netInfo = await NetInfo.fetch();
+    console.log('Network Status:', netInfo.isConnected ? 'Online' : 'Offline');
     
     const { onBack } = this.props;
-    const { title, varietyName, dateSetup, alreadyPlanted, datePlanted, selectedLocation, imageUri } = this.state;
+    const { title, dateSetup, alreadyPlanted, datePlanted, imageUri } = this.state;
 
-    const savedCredentials = await AsyncStorage.getItem('savedCredentials');
-    let userUid = null;
-    if (savedCredentials) {
-      const parsed = JSON.parse(savedCredentials);
-      userUid = parsed.userUid;
-    }
-    
-    const garlicData = {
-      id: Date.now().toString(),
-      userUid,
-      title,
-      varietyName,
-      dateSetup,
-      alreadyPlanted,
-      datePlanted,
-      location: selectedLocation,
-      imageFilename: this.getImageFilename(imageUri),
-      imageUri,
-      status: 'planted'
-    };
-    
-    try {
-      await GarlicPlantStorage.saveGarlicPlant(garlicData);
-      console.log('Garlic data saved successfully');
-      onBack();
-    } catch (error) {
-      console.error('Failed to save garlic data:', error);
-      Alert.alert('Error', 'Failed to save garlic plant data');
+    if (netInfo.isConnected) {
+      try {
+        // Save garlic plant
+        // const garlicPlantData = {
+        //   garlic_title: title,
+        //   variety_id: "977684a2-2c39-4b4e-989c-210643e5bab9",
+        //   plant_location_id: "5747d911-c532-466a-86f6-ce13bf6224d7",
+        //   image_name: null,
+        //   status: 'Pending',
+        //   date_setup: new Date(dateSetup).toISOString(),
+        //   date_planted: alreadyPlanted ? new Date(datePlanted).toISOString() : new Date(dateSetup).toISOString(),
+        //   is_active: true
+        // };
+        const garlicPlantData = {
+          garlic_title: title,
+          variety_id: "977684a2-2c39-4b4e-989c-210643e5bab9",
+          plant_location_id: "5747d911-c532-466a-86f6-ce13bf6224d7",
+          // image_name: null,
+          status: "Pending",
+          date_setup: new Date(dateSetup).toISOString(),
+          date_planted: alreadyPlanted ? new Date(datePlanted).toISOString() : new Date(dateSetup).toISOString(),
+          is_active: true
+        };
+
+        console.log('Sending data:', JSON.stringify(garlicPlantData, null, 2));
+
+        const plantResponse = await fetch(`${API_BASE_URL}/api/v1/garlic-plant/`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(garlicPlantData)
+        });
+
+        console.log('Response status:', plantResponse.status);
+        console.log('Response headers:', plantResponse.headers);
+
+        if (!plantResponse.ok) {
+          const errorText = await plantResponse.text();
+          console.log('Error response:', errorText);
+          throw new Error(`API Error ${plantResponse.status}: ${errorText}`);
+        }
+        const plantResult = await plantResponse.json();
+        console.log('Garlic plant saved:', plantResult);
+
+        // Save garlic image
+        const imageData = {
+          garlic_plant_id: plantResult.id,
+          images_name: this.getImageFilename(imageUri),
+          image_result: 'string',
+          status: 'string',
+          id: Date.now().toString()
+        };
+
+        const imageResponse = await fetch(`${API_BASE_URL}/api/v1/garlic-image/`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(imageData)
+        });
+
+        if (!imageResponse.ok) {
+          const errorData = await imageResponse.json();
+          throw new Error(`Garlic Image API Error: ${JSON.stringify(errorData)}`);
+        }
+        console.log('Garlic image saved successfully');
+        
+        onBack();
+      } catch (error) {
+        console.error('API Error:', error);
+        Alert.alert('Error', 'Failed to save data online');
+      }
+    } else {
+      // Save offline
+      const garlicData = {
+        id: Date.now().toString(),
+        title,
+        dateSetup,
+        alreadyPlanted,
+        datePlanted,
+        imageFilename: this.getImageFilename(imageUri),
+        imageUri,
+        synced: false
+      };
+      
+      try {
+        await GarlicPlantStorage.saveGarlicPlant(garlicData);
+        console.log('Garlic data saved offline');
+        onBack();
+      } catch (error) {
+        console.error('Failed to save garlic data offline:', error);
+        Alert.alert('Error', 'Failed to save garlic plant data');
+      }
     }
   };
 
