@@ -9,6 +9,9 @@ import { LocationStorage, SavedLocation } from '../utils/LocationStorage';
 import { GarlicPlantStorage } from '../utils/GarlicPlantStorage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetworkStatus from '../components/NetworkStatus';
+import { CustomDropdown } from '../components/CustomDropdown';
+import { getAuth } from 'firebase/auth';
+import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 const API_BASE_URL = process.env.API_BASE_URL || 'http://192.168.8.132:8000';
 
@@ -31,11 +34,15 @@ interface CreateGarlicPageState {
   datePlanted: string;
   showDateSetupPicker: boolean;
   showDatePlantedPicker: boolean;
-  selectedLocation: string;
+  selectedLocation: SavedLocation | null;
   savedLocations: SavedLocation[];
   showLocationDropdown: boolean;
   imageUri: string;
   showCustomCamera: boolean;
+  selectedVariety: any;
+  varieties: any[];
+  userData: any;
+  isLoading: boolean;
 }
 
 export class CreateGarlicPage extends Component<CreateGarlicPageProps, CreateGarlicPageState> {
@@ -49,19 +56,63 @@ export class CreateGarlicPage extends Component<CreateGarlicPageProps, CreateGar
       datePlanted: '',
       showDateSetupPicker: false,
       showDatePlantedPicker: false,
-      selectedLocation: '',
+      selectedLocation: null,
       savedLocations: [],
       showLocationDropdown: false,
       imageUri: '',
-      showCustomCamera: false
+      showCustomCamera: false,
+      selectedVariety: null,
+      varieties: [],
+      userData: null,
+      isLoading: false
     };
   }
 
   async componentDidMount() {
-    const userId = this.props.useruid || 'temp_user';
-    const savedLocations = await LocationStorage.getSavedLocations(userId);
-    this.setState({ savedLocations });
+    try {
+      const auth = getAuth();
+      const user = auth.currentUser;
+      const userResponse = await fetch(`${API_BASE_URL}/api/v1/users/users/firebase_id/${user?.uid}`);
+      const userData = await userResponse.json();
+      
+      const userLocation = await fetch(`${API_BASE_URL}/api/v1/users/plant_location/${userData.id}`);
+      const userLocationData = await userLocation.json();
+      console.log('userLocation:', userLocationData);
+      
+      const savedLocations: SavedLocation[] = userLocationData.map((loc: any) => ({
+        id: loc.id,
+        city: loc.city,
+        province: loc.province,
+        region: loc.region,
+        coords: { latitude: loc.latitude, longitude: loc.longitude },
+        savedAt: new Date().toISOString(),
+        user_id: userData.id
+      }));
+      
+      // Fetch varieties
+      const varietiesResponse = await fetch(`${API_BASE_URL}/api/v1/garlic-variety/`);
+      const varieties = await varietiesResponse.json();
+      
+      this.setState({ savedLocations, varieties, userData });
+    } catch (error) {
+      console.error('Failed to load data:', error);
+      this.setState({ savedLocations: [], varieties: [] });
+    }
   }
+
+  private handleVarietySelect = (variety: any): void => {
+    console.log('Selected variety:', variety);
+    this.setState({ selectedVariety: variety, varietyName: variety.variety_name });
+  };
+
+  private handleLocationSelect = (location: SavedLocation): void => {
+    console.log('Selected location:', location);
+    this.setState({ selectedLocation: location });
+  };
+
+  private logSavedLocationsList = (): void => {
+    
+  };
 
   private formatDate = (date: Date): string => {
     const year = date.getFullYear();
@@ -190,6 +241,7 @@ export class CreateGarlicPage extends Component<CreateGarlicPageProps, CreateGar
       return;
     }
 
+    this.setState({ isLoading: true });
     const netInfo = await NetInfo.fetch();
     console.log('Network Status:', netInfo.isConnected ? 'Online' : 'Offline');
     
@@ -198,28 +250,37 @@ export class CreateGarlicPage extends Component<CreateGarlicPageProps, CreateGar
 
     if (netInfo.isConnected) {
       try {
+        // Check Firebase auth
+        const auth = getAuth();
+        const user = auth.currentUser;
+        if (!user) {
+          throw new Error('User not authenticated');
+        }
+
+        // Upload image to Firebase Storage
+        let imageUploadUrl = '';
+        if (imageUri) {
+          const response = await fetch(imageUri);
+          const blob = await response.blob();
+          const storage = getStorage();
+          const imageRef = ref(storage, `garlic_images/${this.getImageFilename(imageUri)}`);
+          await uploadBytes(imageRef, blob);
+          imageUploadUrl = await getDownloadURL(imageRef);
+          console.log('Image uploaded to Firebase:', imageUploadUrl);
+        }
+
         // Save garlic plant
-        // const garlicPlantData = {
-        //   garlic_title: title,
-        //   variety_id: "977684a2-2c39-4b4e-989c-210643e5bab9",
-        //   plant_location_id: "5747d911-c532-466a-86f6-ce13bf6224d7",
-        //   image_name: null,
-        //   status: 'Pending',
-        //   date_setup: new Date(dateSetup).toISOString(),
-        //   date_planted: alreadyPlanted ? new Date(datePlanted).toISOString() : new Date(dateSetup).toISOString(),
-        //   is_active: true
-        // };
         const garlicPlantData = {
           garlic_title: title,
-          variety_id: "977684a2-2c39-4b4e-989c-210643e5bab9",
-          plant_location_id: "5747d911-c532-466a-86f6-ce13bf6224d7",
-          // image_name: null,
-          status: "Pending",
+          user_id: this.state.userData?.id,
+          variety_id: this.state.selectedVariety?.id,
+          plant_location_id: this.state.selectedLocation?.id, 
+          status: 'Pending',
           date_setup: new Date(dateSetup).toISOString(),
           date_planted: alreadyPlanted ? new Date(datePlanted).toISOString() : new Date(dateSetup).toISOString(),
           is_active: true
         };
-
+  
         console.log('Sending data:', JSON.stringify(garlicPlantData, null, 2));
 
         const plantResponse = await fetch(`${API_BASE_URL}/api/v1/garlic-plant/`, {
@@ -242,13 +303,16 @@ export class CreateGarlicPage extends Component<CreateGarlicPageProps, CreateGar
         // Save garlic image
         const imageData = {
           garlic_plant_id: plantResult.id,
-          images_name: this.getImageFilename(imageUri),
-          image_result: 'string',
-          status: 'string',
-          id: Date.now().toString()
+          images_name: `${user.uid}_${Date.now()}.jpg`,
+          images_bucket: 'garlic_images',
+          images_url: imageUploadUrl,
+          image_result: 'uploaded',
+          status: 'active',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
         };
 
-        const imageResponse = await fetch(`${API_BASE_URL}/api/v1/garlic-image/`, {
+        const imageResponse = await fetch(`${API_BASE_URL}/api/v1/users/garlic_images/`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(imageData)
@@ -264,6 +328,8 @@ export class CreateGarlicPage extends Component<CreateGarlicPageProps, CreateGar
       } catch (error) {
         console.error('API Error:', error);
         Alert.alert('Error', 'Failed to save data online');
+      } finally {
+        this.setState({ isLoading: false });
       }
     } else {
       // Save offline
@@ -273,7 +339,7 @@ export class CreateGarlicPage extends Component<CreateGarlicPageProps, CreateGar
         title,
         userUid: this.props.useruid || 'temp_user',
         varietyName,
-        location: selectedLocation,
+        location: selectedLocation ? `${selectedLocation.city}, ${selectedLocation.province}` : '',
         status: 'Pending',
         dateSetup,
         alreadyPlanted,
@@ -290,13 +356,15 @@ export class CreateGarlicPage extends Component<CreateGarlicPageProps, CreateGar
       } catch (error) {
         console.error('Failed to save garlic data offline:', error);
         Alert.alert('Error', 'Failed to save garlic plant data');
+      } finally {
+        this.setState({ isLoading: false });
       }
     }
   };
 
   render() {
     const { theme, styles, onBack } = this.props;
-    const { title, varietyName, dateSetup, alreadyPlanted, datePlanted, showDateSetupPicker, showDatePlantedPicker, selectedLocation, savedLocations, showLocationDropdown, imageUri, showCustomCamera } = this.state;
+    const { title, varietyName, dateSetup, alreadyPlanted, datePlanted, showDateSetupPicker, showDatePlantedPicker, selectedLocation, savedLocations, showLocationDropdown, imageUri, showCustomCamera, selectedVariety, varieties, isLoading } = this.state;
     
 
 
@@ -358,27 +426,33 @@ export class CreateGarlicPage extends Component<CreateGarlicPageProps, CreateGar
               placeholderTextColor={theme.text + '80'}
             />
 
-            <Text style={[createStyles.label, { color: theme.text }]}>Variety Name</Text>
-            <TextInput
-              style={[createStyles.input, { borderColor: theme.primary, color: theme.text }]}
-              value={varietyName}
-              onChangeText={(text) => this.setState({ varietyName: text })}
-              placeholder="Enter variety name"
-              placeholderTextColor={theme.text + '80'}
+            <CustomDropdown
+              theme={theme}
+              label="Variety Name"
+              data={varieties.map(variety => ({
+                id: variety.id,
+                label: variety.variety_name,
+                value: variety
+              }))}
+              selectedValue={selectedVariety ? selectedVariety.variety_name : ''}
+              placeholder="Select variety"
+              onSelect={(item) => this.handleVarietySelect(item.value)}
             />
 
            
 
-            <Text style={[createStyles.label, { color: theme.text }]}>Saved Location</Text>
-            <TouchableOpacity
-              style={[createStyles.dropdown, { borderColor: theme.primary }]}
-              onPress={() => this.setState({ showLocationDropdown: true })}
-            >
-              <Text style={[createStyles.dropdownText, { color: selectedLocation ? theme.text : theme.text + '80' }]}>
-                {selectedLocation || 'Select location'}
-              </Text>
-              <Text style={[createStyles.dropdownIcon, { color: theme.text }]}>▼</Text>
-            </TouchableOpacity>
+            <CustomDropdown
+              theme={theme}
+              label="Saved Location"
+              data={savedLocations.map(location => ({
+                id: location.id,
+                label: `${location.city}, ${location.province}`,
+                value: location
+              }))}
+              selectedValue={selectedLocation ? `${selectedLocation.city}, ${selectedLocation.province}` : ''}
+              placeholder="Select location"
+              onSelect={(item) => this.handleLocationSelect(item.value)}
+            />
 
             <Text style={[createStyles.label, { color: theme.text }]}>Date Setup</Text>
             <TouchableOpacity
@@ -505,25 +579,7 @@ export class CreateGarlicPage extends Component<CreateGarlicPageProps, CreateGar
           </View>
         </Modal>
         
-        <Modal visible={showLocationDropdown} transparent animationType="fade">
-          <TouchableOpacity 
-            style={createStyles.dropdownOverlay}
-            onPress={() => this.setState({ showLocationDropdown: false })}
-          >
-            <View style={[createStyles.dropdownModal, { backgroundColor: theme.background, borderColor: theme.primary }]}>
-              <Text style={[createStyles.dropdownTitle, { color: theme.text }]}>Select Location</Text>
-              {savedLocations.map((location) => (
-                <TouchableOpacity
-                  key={location.id}
-                  style={createStyles.dropdownOption}
-                  onPress={() => this.setState({ selectedLocation: location.city, showLocationDropdown: false })}
-                >
-                  <Text style={[createStyles.dropdownOptionText, { color: theme.text }]}>{location.city}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </TouchableOpacity>
-        </Modal>
+
 
         <Modal visible={showCustomCamera} transparent animationType="fade">
           <View style={createStyles.cameraOverlay}>
@@ -556,6 +612,15 @@ export class CreateGarlicPage extends Component<CreateGarlicPageProps, CreateGar
                   <Text style={[createStyles.openCameraButtonText, { color: theme.background }]}>Open Camera</Text>
                 </TouchableOpacity>
               </View>
+            </View>
+          </View>
+        </Modal>
+
+        <Modal visible={isLoading} transparent animationType="fade">
+          <View style={createStyles.loadingOverlay}>
+            <View style={[createStyles.loadingModal, { backgroundColor: theme.background }]}>
+              <Text style={[createStyles.loadingText, { color: theme.text }]}>Saving...</Text>
+              <Text style={[createStyles.loadingSubtext, { color: theme.text + '80' }]}>Please wait while we save your garlic plant</Text>
             </View>
           </View>
         </Modal>
@@ -792,5 +857,26 @@ const createStyles = StyleSheet.create({
   openCameraButtonText: {
     fontSize: 16,
     fontWeight: '600',
+  },
+  loadingOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingModal: {
+    padding: 30,
+    borderRadius: 12,
+    alignItems: 'center',
+    minWidth: 200,
+  },
+  loadingText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 10,
+  },
+  loadingSubtext: {
+    fontSize: 14,
+    textAlign: 'center',
   },
 });
