@@ -58,7 +58,8 @@ export class CreateGarlicPage extends Component<CreateGarlicPageProps, CreateGar
   }
 
   async componentDidMount() {
-    const savedLocations = await LocationStorage.getSavedLocations();
+    const userId = this.props.useruid || 'temp_user';
+    const savedLocations = await LocationStorage.getSavedLocations(userId);
     this.setState({ savedLocations });
   }
 
@@ -266,9 +267,14 @@ export class CreateGarlicPage extends Component<CreateGarlicPageProps, CreateGar
       }
     } else {
       // Save offline
+      const { varietyName, selectedLocation } = this.state;
       const garlicData = {
         id: Date.now().toString(),
         title,
+        userUid: this.props.useruid || 'temp_user',
+        varietyName,
+        location: selectedLocation,
+        status: 'Pending',
         dateSetup,
         alreadyPlanted,
         datePlanted,

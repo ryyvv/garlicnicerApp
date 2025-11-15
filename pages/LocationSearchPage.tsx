@@ -237,8 +237,44 @@ export class LocationSearchPage extends Component<LocationSearchProps, LocationS
       console.log('Existing locations:', existingLocations);
       console.log('Saved locations to sync:', this.state.savedLocations);
       
-      // Filter locations that don't exist in database
-      const locationsToSync = this.state.savedLocations.filter(savedLocation => {
+      // Bidirectional sync: both local to database AND database to local
+      let syncedToDbCount = 0;
+      let syncedToLocalCount = 0;
+      
+      // 1. Sync database locations to local storage (locations that exist in DB but not locally)
+      const locationsToSyncToLocal = existingLocations.filter((dbLocation: any) => {
+        return !this.state.savedLocations.some(savedLocation => 
+          savedLocation.city === dbLocation.city &&
+          savedLocation.province === dbLocation.province &&
+          Math.abs(savedLocation.coords.latitude - dbLocation.latitude) < 0.000001 &&
+          Math.abs(savedLocation.coords.longitude - dbLocation.longitude) < 0.000001
+        );
+      });
+      
+      console.log('Locations to sync to local:', locationsToSyncToLocal);
+      
+      for (const dbLocation of locationsToSyncToLocal) {
+        try {
+          const locationData = {
+            city: dbLocation.city,
+            province: dbLocation.province,
+            region: dbLocation.region,
+            coords: {
+              latitude: dbLocation.latitude,
+              longitude: dbLocation.longitude
+            },
+            user_id: user.uid
+          };
+          
+          await LocationStorage.saveLocation(locationData, user.uid);
+          syncedToLocalCount++;
+        } catch (error) {
+          console.log('Failed to save location locally:', dbLocation.city, error);
+        }
+      }
+      
+      // 2. Sync local locations to database (locations that exist locally but not in DB)
+      const locationsToSyncToDb = this.state.savedLocations.filter(savedLocation => {
         return !existingLocations.some((dbLocation: any) => 
           dbLocation.city === savedLocation.city &&
           dbLocation.province === savedLocation.province &&
@@ -248,16 +284,9 @@ export class LocationSearchPage extends Component<LocationSearchProps, LocationS
         );
       });
 
-      console.log('Locations to sync:', locationsToSync);
+      console.log('Locations to sync to database:', locationsToSyncToDb);
 
-      if (locationsToSync.length === 0) {
-        Alert.alert('Info', 'All locations are already synced');
-        return;
-      }
-
-      // Sync each location
-      let syncedCount = 0;
-      for (const location of locationsToSync) {
+      for (const location of locationsToSyncToDb) {
         try {
           const plantLocationData = {
             region: location.region,
@@ -269,7 +298,7 @@ export class LocationSearchPage extends Component<LocationSearchProps, LocationS
             user_id: userData.id
           };
 
-          console.log('Syncing location:', plantLocationData);
+          console.log('Syncing location to database:', plantLocationData);
 
           const response = await fetch(`${API_BASE_URL}/api/v1/users/plant_location/`, {
             method: 'POST',
@@ -281,19 +310,38 @@ export class LocationSearchPage extends Component<LocationSearchProps, LocationS
 
           if (response.ok) {
             const responseData = await response.json();
-            console.log('Location synced successfully:', responseData);
-            syncedCount++;
+            console.log('Location synced to database successfully:', responseData);
+            syncedToDbCount++;
           } else {
             const errorText = await response.text();
-            console.log('Failed to sync location:', response.status, errorText);
+            console.log('Failed to sync location to database:', response.status, errorText);
           }
         } catch (error) {
-          console.log('Failed to sync location:', location.city, error);
+          console.log('Failed to sync location to database:', location.city, error);
         }
       }
-
-      console.log('Sync completed. Synced count:', syncedCount);
-      Alert.alert('Success', `${syncedCount} locations synced to database`);
+      
+      // Update UI if locations were synced to local storage
+      if (syncedToLocalCount > 0) {
+        const newSavedLocations = await LocationStorage.getSavedLocations(user.uid);
+        if (newSavedLocations.length > 0 && !newSavedLocations.some(loc => loc.isDefault)) {
+          await LocationStorage.setDefaultLocation(newSavedLocations[0].id, user.uid);
+        }
+        await this.loadSavedLocations();
+        this.props.onSavedLocationsUpdate?.();
+      }
+      
+      // Show sync results
+      if (syncedToDbCount === 0 && syncedToLocalCount === 0) {
+        Alert.alert('Info', 'All locations are already synced');
+      } else {
+        const message = [];
+        if (syncedToDbCount > 0) message.push(`${syncedToDbCount} to database`);
+        if (syncedToLocalCount > 0) message.push(`${syncedToLocalCount} to local storage`);
+        Alert.alert('Success', `Synced ${message.join(' and ')}`);
+      }
+      
+      console.log('Sync completed. To DB:', syncedToDbCount, 'To Local:', syncedToLocalCount);
     } catch (error) {
       console.log('Sync error:', error);
       Alert.alert('Error', 'Failed to sync locations');
