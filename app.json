@@ -14,7 +14,10 @@
       "backgroundColor": "#007AFF"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "This app needs access to your location to provide weather information for your area."
+      }
     },
     "android": {
       "adaptiveIcon": {

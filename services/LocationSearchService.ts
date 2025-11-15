@@ -1,14 +1,10 @@
 export interface SearchResult {
-  barangay: null;
-  barangay_code: null;
+  barangay: string;
   city: string;
-  city_code: null;
   province: string;
-  province_code: null;
   region: string;
-  region_code: null;
-  userid: null;
-  id:null;
+  user_id: string;
+  id:string;
   coords: {
     latitude: number;
     longitude: number;
@@ -35,13 +31,9 @@ export class LocationSearchService {
       
       return data.geonames?.map((item: any) => ({
         barangay: null,
-        barangay_code: null,
         city: item.name,
-        city_code: null,
         province: item.adminName1 || '',
-        province_code: null,
         region: item.adminName2 || '',
-        region_code: null,
         coords: {
           latitude: parseFloat(item.lat),
           longitude: parseFloat(item.lng)

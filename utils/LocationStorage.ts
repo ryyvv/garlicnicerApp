@@ -8,32 +8,37 @@ export interface SavedLocation {
   coords: { latitude: number; longitude: number };
   savedAt: string;
   isDefault?: boolean;
+  user_id: string;
 }
 
 const STORAGE_KEY = 'saved_locations';
 
 export class LocationStorage {
-  static async saveLocation(location: Omit<SavedLocation, 'id' | 'savedAt'>): Promise<void> {
+  static async saveLocation(location: Omit<SavedLocation, 'id' | 'savedAt'>, userId: string): Promise<void> {
     try {
       const savedLocation: SavedLocation = {
         ...location,
         id: Date.now().toString(),
-        savedAt: new Date().toISOString()
+        savedAt: new Date().toISOString(),
+        user_id: userId
       };
 
-      const existing = await this.getSavedLocations();
+      const existing = await this.getSavedLocations(userId);
       const updated = [...existing, savedLocation];
       
-      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(await this.getAllLocations().then(all => all.filter(loc => loc.user_id !== userId).concat(updated))));
     } catch (error) {
       throw new Error('Failed to save location');
     }
   }
 
-  static async setDefaultLocation(id: string): Promise<void> {
+  static async setDefaultLocation(id: string, userId: string): Promise<void> {
     try {
-      const existing = await this.getSavedLocations();
-      const updated = existing.map(loc => ({ ...loc, isDefault: loc.id === id }));
+      const allLocations = await this.getAllLocations();
+      const updated = allLocations.map(loc => ({ 
+        ...loc, 
+        isDefault: loc.user_id === userId ? loc.id === id : loc.isDefault 
+      }));
       
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
     } catch (error) {
@@ -41,16 +46,25 @@ export class LocationStorage {
     }
   }
 
-  static async getDefaultLocation(): Promise<SavedLocation | null> {
+  static async getDefaultLocation(userId: string): Promise<SavedLocation | null> {
     try {
-      const locations = await this.getSavedLocations();
+      const locations = await this.getSavedLocations(userId);
       return locations.find(loc => loc.isDefault) || null;
     } catch {
       return null;
     }
   }
 
-  static async getSavedLocations(): Promise<SavedLocation[]> {
+  static async getSavedLocations(userId: string): Promise<SavedLocation[]> {
+    try {
+      const allLocations = await this.getAllLocations();
+      return allLocations.filter(loc => loc.user_id === userId);
+    } catch {
+      return [];
+    }
+  }
+
+  private static async getAllLocations(): Promise<SavedLocation[]> {
     try {
       const data = await AsyncStorage.getItem(STORAGE_KEY);
       return data ? JSON.parse(data) : [];
@@ -59,10 +73,10 @@ export class LocationStorage {
     }
   }
 
-  static async removeLocation(id: string): Promise<void> {
+  static async removeLocation(id: string, userId: string): Promise<void> {
     try {
-      const existing = await this.getSavedLocations();
-      const updated = existing.filter(loc => loc.id !== id);
+      const allLocations = await this.getAllLocations();
+      const updated = allLocations.filter(loc => !(loc.id === id && loc.user_id === userId));
       
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
     } catch (error) {

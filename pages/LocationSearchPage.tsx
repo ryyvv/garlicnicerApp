@@ -1,6 +1,7 @@
 import React, { Component } from 'react';
 import { View, Text, TextInput, TouchableOpacity, FlatList, Alert } from 'react-native';
 import * as Location from 'expo-location';
+import { getAuth } from 'firebase/auth';
 import { LocationStorage, SavedLocation } from '../utils/LocationStorage';
 
 interface LocationSearchProps {
@@ -41,7 +42,11 @@ export class LocationSearchPage extends Component<LocationSearchProps, LocationS
 
   private loadSavedLocations = async (): Promise<void> => {
     try {
-      const saved = await LocationStorage.getSavedLocations();
+      const auth = getAuth();
+      const user = auth.currentUser;
+      const userId = user?.uid || 'temp_user';
+      
+      const saved = await LocationStorage.getSavedLocations(userId);
       this.setState({ savedLocations: saved });
     } catch (error) {
       console.log('Failed to load saved locations');
@@ -111,15 +116,19 @@ export class LocationSearchPage extends Component<LocationSearchProps, LocationS
     }
 
     try {
-      const savedLocations = await LocationStorage.getSavedLocations();
+      const auth = getAuth();
+      const user = auth.currentUser;
+      const userId = user?.uid || 'temp_user';
+      
+      const savedLocations = await LocationStorage.getSavedLocations(userId);
       const isFirstLocation = savedLocations.length === 0;
       
-      await LocationStorage.saveLocation(location);
+      await LocationStorage.saveLocation(location, userId);
       
       if (isFirstLocation) {
-        const newSavedLocations = await LocationStorage.getSavedLocations();
+        const newSavedLocations = await LocationStorage.getSavedLocations(userId);
         if (newSavedLocations.length > 0) {
-          await LocationStorage.setDefaultLocation(newSavedLocations[0].id);
+          await LocationStorage.setDefaultLocation(newSavedLocations[0].id, userId);
           console.log('First saved location set as default:', location);
         }
       }
@@ -135,7 +144,11 @@ export class LocationSearchPage extends Component<LocationSearchProps, LocationS
 
   private removeSavedLocation = async (id: string): Promise<void> => {
     try {
-      await LocationStorage.removeLocation(id);
+      const auth = getAuth();
+      const user = auth.currentUser;
+      const userId = user?.uid || 'temp_user';
+      
+      await LocationStorage.removeLocation(id, userId);
       this.loadSavedLocations();
       this.setState({ dropdownVisible: null });
     } catch (error) {
@@ -145,9 +158,13 @@ export class LocationSearchPage extends Component<LocationSearchProps, LocationS
 
   private setAsDefault = async (location: SavedLocation): Promise<void> => {
     try {
-      await LocationStorage.setDefaultLocation(location.id);
+      const auth = getAuth();
+      const user = auth.currentUser;
+      const userId = user?.uid || 'temp_user';
+      
+      await LocationStorage.setDefaultLocation(location.id, userId);
       console.log('Default location set:', location);
-      const defaultLocation = await LocationStorage.getDefaultLocation();
+      const defaultLocation = await LocationStorage.getDefaultLocation(userId);
       console.log('Default location from storage:', defaultLocation);
       this.loadSavedLocations();
       this.handleLocationSelect(location);
@@ -159,6 +176,128 @@ export class LocationSearchPage extends Component<LocationSearchProps, LocationS
 
   private toggleDropdown = (id: string): void => {
     this.setState({ dropdownVisible: this.state.dropdownVisible === id ? null : id });
+  };
+
+  private deleteAllExceptDefault = async (): Promise<void> => {
+    try {
+      const auth = getAuth();
+      const user = auth.currentUser;
+      const userId = user?.uid || 'temp_user';
+      
+      const locationsToDelete = this.state.savedLocations.filter(location => !location.isDefault);
+      
+      for (const location of locationsToDelete) {
+        await LocationStorage.removeLocation(location.id, userId);
+      }
+      
+      this.loadSavedLocations();
+      this.props.onSavedLocationsUpdate?.();
+      Alert.alert('Success', 'All locations deleted except default');
+    } catch (error) {
+      Alert.alert('Error', 'Failed to delete locations');
+    }
+  };
+
+  private syncLocationsToDatabase = async (): Promise<void> => {
+    try {
+      console.log('Starting sync process...');
+      const auth = getAuth();
+      const user = auth.currentUser;
+      
+      if (!user) {
+        Alert.alert('Error', 'User not authenticated');
+        return;
+      }
+
+      const API_BASE_URL = process.env.API_BASE_URL || 'http://192.168.8.132:8000';
+      console.log('API_BASE_URL:', API_BASE_URL);
+      
+      // Get user data from API
+      console.log('Fetching user data for:', user.uid);
+      const userResponse = await fetch(`${API_BASE_URL}/api/v1/users/users/firebase_id/${user.uid}`);
+      const userData = await userResponse.json();
+      console.log('User data:', userData);
+      
+      if (!userData || !userData.id) {
+        Alert.alert('Error', 'User data not found');
+        return;
+      }
+
+      // Get existing plant locations from database for this user
+      console.log('Fetching existing locations for user:', userData.id);
+      const existingResponse = await fetch(`${API_BASE_URL}/api/v1/users/plant_location/${userData.id}`);
+      
+      if (!existingResponse.ok) {
+        console.log('Failed to fetch existing locations:', existingResponse.status);
+        Alert.alert('Error', 'Failed to fetch existing locations');
+        return;
+      }
+      
+      const existingLocations = await existingResponse.json();
+      console.log('Existing locations:', existingLocations);
+      console.log('Saved locations to sync:', this.state.savedLocations);
+      
+      // Filter locations that don't exist in database
+      const locationsToSync = this.state.savedLocations.filter(savedLocation => {
+        return !existingLocations.some((dbLocation: any) => 
+          dbLocation.city === savedLocation.city &&
+          dbLocation.province === savedLocation.province &&
+          Math.abs(dbLocation.latitude - savedLocation.coords.latitude) < 0.000001 &&
+          Math.abs(dbLocation.longitude - savedLocation.coords.longitude) < 0.000001 &&
+          dbLocation.user_id === userData.id
+        );
+      });
+
+      console.log('Locations to sync:', locationsToSync);
+
+      if (locationsToSync.length === 0) {
+        Alert.alert('Info', 'All locations are already synced');
+        return;
+      }
+
+      // Sync each location
+      let syncedCount = 0;
+      for (const location of locationsToSync) {
+        try {
+          const plantLocationData = {
+            region: location.region,
+            province: location.province,
+            city: location.city,
+            barangay: 'Unknown',
+            latitude: location.coords.latitude,
+            longitude: location.coords.longitude,
+            user_id: userData.id
+          };
+
+          console.log('Syncing location:', plantLocationData);
+
+          const response = await fetch(`${API_BASE_URL}/api/v1/users/plant_location/`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(plantLocationData)
+          });
+
+          if (response.ok) {
+            const responseData = await response.json();
+            console.log('Location synced successfully:', responseData);
+            syncedCount++;
+          } else {
+            const errorText = await response.text();
+            console.log('Failed to sync location:', response.status, errorText);
+          }
+        } catch (error) {
+          console.log('Failed to sync location:', location.city, error);
+        }
+      }
+
+      console.log('Sync completed. Synced count:', syncedCount);
+      Alert.alert('Success', `${syncedCount} locations synced to database`);
+    } catch (error) {
+      console.log('Sync error:', error);
+      Alert.alert('Error', 'Failed to sync locations');
+    }
   };
 
   render() {
@@ -214,9 +353,37 @@ export class LocationSearchPage extends Component<LocationSearchProps, LocationS
 
         {filteredSavedLocations.length > 0 && (
           <View style={{ marginBottom: 20 }}>
-            <Text style={{ fontSize: 16, fontWeight: 'bold', color: theme.text, marginBottom: 10 }}>
-              Saved Locations
-            </Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+              <Text style={{ fontSize: 16, fontWeight: 'bold', color: theme.text }}>
+                Saved Locations
+              </Text>
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: '#007AFF',
+                    paddingHorizontal: 12,
+                    paddingVertical: 6,
+                    borderRadius: 6
+                  }}
+                  onPress={this.syncLocationsToDatabase}
+                >
+                  <Text style={{ color: 'white', fontSize: 12, fontWeight: 'bold' }}>Sync</Text>
+                </TouchableOpacity>
+                {filteredSavedLocations.length > 1 && (
+                  <TouchableOpacity
+                    style={{
+                      backgroundColor: '#FF3B30',
+                      paddingHorizontal: 12,
+                      paddingVertical: 6,
+                      borderRadius: 6
+                    }}
+                    onPress={this.deleteAllExceptDefault}
+                  >
+                    <Text style={{ color: 'white', fontSize: 12, fontWeight: 'bold' }}>Delete All</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
             {sortedSavedLocations.map((item) => (
               <View
                 key={item.id}
