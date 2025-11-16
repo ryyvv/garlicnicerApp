@@ -3,6 +3,7 @@ import { ScrollView, View, Text, StyleSheet, Image } from 'react-native';
 import { LocationStorage } from '../utils/LocationStorage';
 import { SafeContainer } from '../components/SafeContainer'; 
 import { SavedLocation } from '../utils/LocationStorage';
+import { ENV } from '../config/env'; 
 
 interface ForecastPageProps {
   theme: any;
@@ -34,7 +35,8 @@ export class ForecastPage extends Component<ForecastPageProps, ForecastPageState
 
   loadDefaultLocation = async () => {
     try {
-      const locations = await LocationStorage.getSavedLocations();
+      const userId = 'temp_user'; // You may want to get this from auth
+      const locations = await LocationStorage.getSavedLocations(userId);
       // console.log('Saved locations:', locations);
       const defaultLoc = locations.find(loc => loc.isDefault);
       // console.log('Default location found:', defaultLoc);

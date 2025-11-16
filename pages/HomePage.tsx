@@ -9,7 +9,7 @@ import { GarlicVarieties, sampleGarlicVarieties } from '../components/GarlicVari
 import { ThemeManager, themes, getTheme } from '../components/ThemeManager';
 import { LocationSearchPage } from './LocationSearchPage';
 import { LocationStorage, SavedLocation } from '../utils/LocationStorage';
-const API_BASE_URL = process.env.API_BASE_URL || 'http://192.168.8.132:8000';
+import { ENV } from '../config/env';
 interface HomePageProps {
   theme: any;
   styles: any;
@@ -53,6 +53,7 @@ export class HomePage extends Component<HomePageProps, HomePageState> {
       const userId = user?.uid || 'temp_user';
       
       const savedLocations = await LocationStorage.getSavedLocations(userId);
+  
       
       if (savedLocations.length === 0) {
         await this.getCurrentLocationAndSave();
@@ -191,7 +192,7 @@ export class HomePage extends Component<HomePageProps, HomePageState> {
             
             if (user) {
               // Get user data from API
-              const userResponse = await fetch(`${API_BASE_URL}/api/v1/users/users/firebase_id/${user.uid}`);
+              const userResponse = await fetch(`${ENV.API_BASE_URL}/api/v1/users/users/firebase_id/${user.uid}`);
               const userData = await userResponse.json();
               console.log("userData: ", userData)
               
@@ -208,12 +209,12 @@ export class HomePage extends Component<HomePageProps, HomePageState> {
                 };
                 
                 console.log('Sending plant location data:', plantLocationData);
-                console.log('API URL:', `${API_BASE_URL}/api/v1/users/plant_location/`);
+                console.log('API URL:', `${ENV.API_BASE_URL}/api/v1/users/plant_location/`);
                 
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
                 
-                const apiResponse = await fetch(`${API_BASE_URL}/api/v1/users/plant_location/`, {
+                const apiResponse = await fetch(`${ENV.API_BASE_URL}/api/v1/users/plant_location/`, {
                   method: 'POST',
                   headers: {
                     'Content-Type': 'application/json',

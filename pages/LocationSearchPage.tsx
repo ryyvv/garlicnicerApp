@@ -3,7 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, FlatList, Alert } from 'react-
 import * as Location from 'expo-location';
 import { getAuth } from 'firebase/auth';
 import { LocationStorage, SavedLocation } from '../utils/LocationStorage';
-
+import { ENV } from '../config/env'; 
 interface LocationSearchProps {
   theme: any;
   onLocationSelect: (location: { city: string; province: string; region: string; coords?: { latitude: number; longitude: number } }) => void;
@@ -208,13 +208,10 @@ export class LocationSearchPage extends Component<LocationSearchProps, LocationS
         Alert.alert('Error', 'User not authenticated');
         return;
       }
-
-      const API_BASE_URL = process.env.API_BASE_URL || 'http://192.168.8.132:8000';
-      console.log('API_BASE_URL:', API_BASE_URL);
-      
+    
       // Get user data from API
       console.log('Fetching user data for:', user.uid);
-      const userResponse = await fetch(`${API_BASE_URL}/api/v1/users/users/firebase_id/${user.uid}`);
+      const userResponse = await fetch(`${ENV.API_BASE_URL}/api/v1/users/users/firebase_id/${user.uid}`);
       const userData = await userResponse.json();
       console.log('User data:', userData);
       
@@ -225,7 +222,7 @@ export class LocationSearchPage extends Component<LocationSearchProps, LocationS
 
       // Get existing plant locations from database for this user
       console.log('Fetching existing locations for user:', userData.id);
-      const existingResponse = await fetch(`${API_BASE_URL}/api/v1/users/plant_location/${userData.id}`);
+      const existingResponse = await fetch(`${ENV.API_BASE_URL}/api/v1/users/plant_location/${userData.id}`);
       
       if (!existingResponse.ok) {
         console.log('Failed to fetch existing locations:', existingResponse.status);
@@ -300,7 +297,7 @@ export class LocationSearchPage extends Component<LocationSearchProps, LocationS
 
           console.log('Syncing location to database:', plantLocationData);
 
-          const response = await fetch(`${API_BASE_URL}/api/v1/users/plant_location/`, {
+          const response = await fetch(`${ENV.API_BASE_URL}/api/v1/users/plant_location/`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',

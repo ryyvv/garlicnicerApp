@@ -6,6 +6,7 @@ import { SafeContainer } from '../components/SafeContainer';
 import { CreateGarlicPage } from './CreateGarlicPage';
 import { GarlicDetailPage } from './GarlicDetailPage';
 import { GarlicPlantData } from '../utils/GarlicPlantStorage';
+import { ENV } from '../config/env'; 
 
 interface GarlicListPageProps {
   theme: any;

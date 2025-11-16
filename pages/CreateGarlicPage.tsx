@@ -12,8 +12,7 @@ import NetworkStatus from '../components/NetworkStatus';
 import { CustomDropdown } from '../components/CustomDropdown';
 import { getAuth } from 'firebase/auth';
 import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-
-const API_BASE_URL = process.env.API_BASE_URL || 'http://192.168.8.132:8000';
+import { ENV } from '../config/env'; 
 
 
 interface CreateGarlicPageProps {
@@ -72,10 +71,10 @@ export class CreateGarlicPage extends Component<CreateGarlicPageProps, CreateGar
     try {
       const auth = getAuth();
       const user = auth.currentUser;
-      const userResponse = await fetch(`${API_BASE_URL}/api/v1/users/users/firebase_id/${user?.uid}`);
+      const userResponse = await fetch(`${ENV.API_BASE_URL}/api/v1/users/users/firebase_id/${user?.uid}`);
       const userData = await userResponse.json();
       
-      const userLocation = await fetch(`${API_BASE_URL}/api/v1/users/plant_location/${userData.id}`);
+      const userLocation = await fetch(`${ENV.API_BASE_URL}/api/v1/users/plant_location/${userData.id}`);
       const userLocationData = await userLocation.json();
       console.log('userLocation:', userLocationData);
       
@@ -90,7 +89,7 @@ export class CreateGarlicPage extends Component<CreateGarlicPageProps, CreateGar
       }));
       
       // Fetch varieties
-      const varietiesResponse = await fetch(`${API_BASE_URL}/api/v1/garlic-variety/`);
+      const varietiesResponse = await fetch(`${ENV.API_BASE_URL}/api/v1/garlic-variety/`);
       const varieties = await varietiesResponse.json();
       
       this.setState({ savedLocations, varieties, userData });
@@ -283,7 +282,7 @@ export class CreateGarlicPage extends Component<CreateGarlicPageProps, CreateGar
   
         console.log('Sending data:', JSON.stringify(garlicPlantData, null, 2));
 
-        const plantResponse = await fetch(`${API_BASE_URL}/api/v1/garlic-plant/`, {
+        const plantResponse = await fetch(`${ENV.API_BASE_URL}/api/v1/garlic-plant/`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(garlicPlantData)
@@ -312,7 +311,7 @@ export class CreateGarlicPage extends Component<CreateGarlicPageProps, CreateGar
           updated_at: new Date().toISOString()
         };
 
-        const imageResponse = await fetch(`${API_BASE_URL}/api/v1/users/garlic_images/`, {
+        const imageResponse = await fetch(`${ENV.API_BASE_URL}/api/v1/users/garlic_images/`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(imageData)

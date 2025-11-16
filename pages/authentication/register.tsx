@@ -1,9 +1,8 @@
 import * as React from 'react';
 import { SafeAreaView, View, Text, TextInput, TouchableOpacity, Alert, Modal, ActivityIndicator, StyleSheet } from 'react-native';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '../../firebase.config';
-const API_BASE_URL = process.env.API_BASE_URL || 'http://192.168.8.132:8000';
-
+import { auth } from '../../firebase.config'; 
+import { ENV } from '../../config/env';
 interface RegisterPageProps {
   theme: any;
   styles: any;
@@ -59,7 +58,7 @@ export class RegisterPage extends React.Component<RegisterPageProps, RegisterPag
         firebase_uid: firebaseUser.uid
       };
 
-      const response = await fetch(`${API_BASE_URL}/api/v1/users/`, {
+      const response = await fetch(`${ENV.API_BASE_URL}/api/v1/users/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(userData)

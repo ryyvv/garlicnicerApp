@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-const API_BASE_URL = process.env.API_BASE_URL || 'http://192.168.8.132:8000';
+import { ENV } from '../config/env';
+import { getAuth } from 'firebase/auth';
 
 export interface SavedLocation {
   id: string;
@@ -35,9 +36,18 @@ export class LocationStorage {
 
    static async fetchlocatio(location: Omit<SavedLocation, 'id' | 'savedAt'>, userId: string): Promise<void> {
     try {
-      const userResponse = await fetch(`${API_BASE_URL}/api/v1/users/users/firebase_id/${user.uid}`);
+      const auth = getAuth();
+      const user = auth.currentUser;
+
+      const userResponse = await fetch(`${ENV.API_BASE_URL}/api/v1/users/users/firebase_id/${user?.uid}`);
       const userData = await userResponse.json();
 
+      const savedLocation: SavedLocation = {
+        ...location,
+        id: Date.now().toString(),
+        savedAt: new Date().toISOString(),
+        user_id: userId
+      };
 
       const existing = await this.getSavedLocations(userId);
       const updated = [...existing, savedLocation];

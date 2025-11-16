@@ -22,6 +22,7 @@ class NetworkStatus extends React.Component<NetworkStatusProps, NetworkStatusSta
   private readonly styles: NetworkStatusStyles;
   private fadeAnim: Animated.Value;
   private hideTimeout: NodeJS.Timeout | null = null;
+  private unsubscribe: (() => void) | null = null;
 
   constructor(props: NetworkStatusProps) {
     super(props);
@@ -57,7 +58,7 @@ class NetworkStatus extends React.Component<NetworkStatusProps, NetworkStatusSta
   }
 
   public componentDidMount(): void {
-    const unsubscribe = NetInfo.addEventListener(state => {
+    this.unsubscribe = NetInfo.addEventListener(state => {
       const wasConnected = this.state.isConnected;
       const isConnected = state.isConnected;
 
@@ -68,8 +69,15 @@ class NetworkStatus extends React.Component<NetworkStatusProps, NetworkStatusSta
         this.setState({ isConnected });
       }
     });
+  }
 
-    return () => unsubscribe();
+  public componentWillUnmount(): void {
+    if (this.unsubscribe) {
+      this.unsubscribe();
+    }
+    if (this.hideTimeout) {
+      clearTimeout(this.hideTimeout);
+    }
   }
 
   private showStatusMessage = (): void => {

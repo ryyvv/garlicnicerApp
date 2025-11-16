@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
 
 const GARLIC_PLANTS_KEY = 'garlicPlants';
-const API_ENDPOINT = 'https://your-api-endpoint.com/garlic-plants';
+import { ENV } from '../config/env';
 
 export interface GarlicPlantData {
   id: string;
@@ -50,7 +50,7 @@ export class GarlicPlantStorage {
   }
 
   private static async uploadToServer(garlicData: GarlicPlantData): Promise<void> {
-    const response = await fetch(API_ENDPOINT, {
+    const response = await fetch( `${ENV.API_BASE_URL}/garlic-plants`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

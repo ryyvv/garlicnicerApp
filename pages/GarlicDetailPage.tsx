@@ -2,6 +2,7 @@ import React, { Component } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Image } from 'react-native';
 import { SafeContainer } from '../components/SafeContainer';
 import { GarlicPlantData } from '../utils/GarlicPlantStorage';
+import { ENV } from '../config/env'; 
 
 interface GarlicDetailPageProps {
   theme: any;
